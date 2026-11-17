@@ -65,3 +65,8 @@
 | Live Chrome File System Access "link file" flow | Needs a user gesture + OS file picker | Code copied unchanged; guest HTML import E2E passes on both builds |
 
 **Conclusion:** for every state that can be rendered without a live auth backend, V2 is pixel-identical to the original in Chromium. Authenticated screens are unverified visually.
+
+## Intentional changes requested after the parity run (2026-11-17)
+| Change | Where | Effect on the captures above |
+|---|---|---|
+| Navigation label "All Websites" renamed to **"Main Page"** (also the collapsed-sidebar icon tooltip/aria-label and the "Back to Main Page" link) | `src/App.tsx` | Captures showing the top menu or sidebar now differ from the original by this label text only. The 42/42 result above predates this change. |
