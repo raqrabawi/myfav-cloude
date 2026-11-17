@@ -25,3 +25,12 @@ describe('startup env validation (Neon)', () => {
     expect(validateNeonEnv('https://ep-x.aws.neon.tech/').ok).toBe(false);
   });
 });
+
+import { DEFAULT_NEON_URL } from '../../src/lib/neonClient';
+
+describe('built-in default (hosts without build-time env, e.g. Figma Sites)', () => {
+  it('is a valid public production URL with no credentials', () => {
+    expect(validateNeonEnv(DEFAULT_NEON_URL).ok).toBe(true);
+    expect(DEFAULT_NEON_URL).toMatch(/^https:\/\/ep-icy-firefly-be63sv9l\.c-9\.us-east-2\.aws\.neon\.tech\/neondb$/);
+  });
+});
