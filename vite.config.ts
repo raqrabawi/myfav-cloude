@@ -41,21 +41,6 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },
-    build: {
-      rolldownOptions: {
-        output: {
-          codeSplitting: {
-            groups: [
-              {
-                name: 'vendor',
-                test: /node_modules[\\/]/,
-                maxSize: 450 * 1024,
-              },
-            ],
-          },
-        },
-      },
-    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
