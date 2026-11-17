@@ -36,6 +36,22 @@ export default defineConfig(({mode}) => {
 
   return {
     plugins: [react(), tailwindcss(), googleTagManagerPlugin(gtmId)],
+    build: {
+      rollupOptions: {
+        output: {
+          // Libraries change far less often than app code: separate files let
+          // browsers keep them cached across MyFav deploys.
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
+            if (/[\\/]node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'vendor-motion';
+            if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return 'vendor-icons';
+            if (/[\\/]node_modules[\\/](@neon|better-auth|@better-auth|@supabase|jose|nanostores|@better-fetch)/.test(id)) return 'vendor-auth-data';
+            return 'vendor';
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),

@@ -160,6 +160,8 @@ describe('sign-in with existing data: automatic sync, no prompt', () => {
 
     expect(api.syncLocalWorkspace).toHaveBeenCalledTimes(1);
     expect(api.syncLocalWorkspace.mock.calls[0][0].bookmarks.map((b: { id: string }) => b.id)).toEqual(['g1']);
+    // The sync's own result is reused: no second full workspace download.
+    expect(api.getWorkspace).not.toHaveBeenCalled();
     expect(host.textContent).not.toMatch(/Sync Local|Keep Local|Start Fresh|Choose how/i);
     expect(host.textContent).toContain('Cloud Secret Site');
     expect(host.textContent).toContain('Main Page');
@@ -170,6 +172,7 @@ describe('sign-in with existing data: automatic sync, no prompt', () => {
   it('with no local data, just opens the cloud workspace (nothing to upload)', async () => {
     await renderSignedIn();
     expect(api.syncLocalWorkspace).not.toHaveBeenCalled();
+    expect(api.getWorkspace).toHaveBeenCalledTimes(1);
     expect(host.textContent).toContain('Cloud Secret Site');
     expect(localStorage.getItem(KEYS.LINKED)).toBe('u1');
   });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import myFavLogoImg from '../assets/images/myfav_app_logo_1794774931445.jpg';
+import myFavLogoImg from '../assets/images/myfav_app_logo_160.webp';
 
 interface MyFavLogoProps {
   size?: 'sm' | 'md' | 'lg';
@@ -36,6 +36,9 @@ export const MyFavLogo: React.FC<MyFavLogoProps> = ({
           <img
             src={myFavLogoImg}
             alt="MyFav Logo"
+            width={160}
+            height={160}
+            decoding="async"
             onError={() => setImgError(true)}
             className="w-full h-full object-cover scale-125"
           />

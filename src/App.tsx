@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -87,20 +87,55 @@ import {
   pickLiveChromeBookmarksFile,
   readLinkedChromeFile,
 } from './utils/chromeLiveSync';
-import { BookmarkModal } from './components/BookmarkModal';
-import { MoveWebsiteModal } from './components/MoveWebsiteModal';
-import { BatchEditModal, BatchEditPayload } from './components/BatchEditModal';
-import { CategoryManagerModal as CategoriesPage } from './components/CategoryManagerModal';
-import { SettingsModal as SettingsPage } from './components/SettingsModal';
-import { ChromeSyncPage } from './components/ChromeSyncPage';
-import { WebsitePreviewModal } from './components/WebsitePreviewModal';
-import { QuickShortcutModal } from './components/QuickShortcutModal';
-import { ChromeImportModal } from './components/ChromeImportModal';
+import type { BatchEditPayload } from './components/BatchEditModal';
 import { MyFavLogo } from './components/MyFavLogo';
-import { ShareCategoryModal } from './components/ShareCategoryModal';
-import { SharedCollectionView } from './components/SharedCollectionView';
-import { AccountSyncModal } from './components/AccountSyncModal';
-import { AuthPage, AuthPageMode } from './components/AuthPage';
+import type { AuthPageMode } from './components/AuthPage';
+import { Deferred } from './components/Deferred';
+
+// Screens and dialogs that are not needed for the first paint of the Main Page
+// load on demand (and are prefetched in the background once the app is idle).
+const loadBookmarkModal = () => import('./components/BookmarkModal');
+const loadMoveWebsiteModal = () => import('./components/MoveWebsiteModal');
+const loadBatchEditModal = () => import('./components/BatchEditModal');
+const loadCategoriesPage = () => import('./components/CategoryManagerModal');
+const loadSettingsPage = () => import('./components/SettingsModal');
+const loadWebsitePreviewModal = () => import('./components/WebsitePreviewModal');
+const loadQuickShortcutModal = () => import('./components/QuickShortcutModal');
+const loadChromeImportModal = () => import('./components/ChromeImportModal');
+const loadShareCategoryModal = () => import('./components/ShareCategoryModal');
+const loadSharedCollectionView = () => import('./components/SharedCollectionView');
+const loadAccountSyncModal = () => import('./components/AccountSyncModal');
+const loadAuthPage = () => import('./components/AuthPage');
+
+const BookmarkModal = lazy(() => loadBookmarkModal().then((m) => ({ default: m.BookmarkModal })));
+const MoveWebsiteModal = lazy(() => loadMoveWebsiteModal().then((m) => ({ default: m.MoveWebsiteModal })));
+const BatchEditModal = lazy(() => loadBatchEditModal().then((m) => ({ default: m.BatchEditModal })));
+const CategoriesPage = lazy(() => loadCategoriesPage().then((m) => ({ default: m.CategoryManagerModal })));
+const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsModal })));
+const WebsitePreviewModal = lazy(() =>
+  loadWebsitePreviewModal().then((m) => ({ default: m.WebsitePreviewModal }))
+);
+const QuickShortcutModal = lazy(() => loadQuickShortcutModal().then((m) => ({ default: m.QuickShortcutModal })));
+const ChromeImportModal = lazy(() => loadChromeImportModal().then((m) => ({ default: m.ChromeImportModal })));
+const ShareCategoryModal = lazy(() => loadShareCategoryModal().then((m) => ({ default: m.ShareCategoryModal })));
+const SharedCollectionView = lazy(() =>
+  loadSharedCollectionView().then((m) => ({ default: m.SharedCollectionView }))
+);
+const AccountSyncModal = lazy(() => loadAccountSyncModal().then((m) => ({ default: m.AccountSyncModal })));
+const AuthPage = lazy(() => loadAuthPage().then((m) => ({ default: m.AuthPage })));
+
+const PREFETCH_ON_IDLE = [
+  loadAuthPage,
+  loadBookmarkModal,
+  loadWebsitePreviewModal,
+  loadSettingsPage,
+  loadCategoriesPage,
+  loadQuickShortcutModal,
+  loadMoveWebsiteModal,
+  loadBatchEditModal,
+  loadShareCategoryModal,
+  loadChromeImportModal,
+];
 import { SignInLoadingOverlay, type SignInLoadingStage } from './components/SignInLoadingOverlay';
 
 const STORAGE_KEYS = {
@@ -508,7 +543,26 @@ export default function App() {
     await signOutUser();
   };
 
+  // Warm the on-demand screens in the background so their first open is instant.
+  useEffect(() => {
+    const run = () => PREFETCH_ON_IDLE.forEach((load) => void load().catch(() => {}));
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run, { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(run, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const wasSignedInRef = useRef(false);
+  const prefetchedWorkspaceRef = useRef<{
+    uid: string;
+    data: Awaited<ReturnType<typeof apiClient.getWorkspace>>;
+  } | null>(null);
 
   // Supabase Auth listener (Firebase-compatible facade) with pre-sync decision gate on login
   useEffect(() => {
@@ -581,11 +635,14 @@ export default function App() {
       let syncFailed = false;
       try {
         if (hasLocalData) {
-          await apiClient.syncLocalWorkspace({
+          const synced = await apiClient.syncLocalWorkspace({
             categories: localCategories,
             bookmarks: localBookmarks,
             quickShortcuts: localShortcuts,
           });
+          // The sync already returns the full workspace: reuse it instead of
+          // fetching everything a second time.
+          prefetchedWorkspaceRef.current = { uid: currentUser.uid, data: synced };
         }
         if (cancelled) return;
         try {
@@ -636,8 +693,14 @@ export default function App() {
     let cancelled = false;
     setCloudLoading(true);
 
-    apiClient
-      .getWorkspace()
+    const prefetched = prefetchedWorkspaceRef.current;
+    prefetchedWorkspaceRef.current = null;
+    const workspacePromise =
+      prefetched && prefetched.uid === user.uid
+        ? Promise.resolve(prefetched.data)
+        : apiClient.getWorkspace();
+
+    workspacePromise
       .then((data) => {
         if (cancelled) return;
         setCategories(data.categories);
@@ -2261,23 +2324,27 @@ export default function App() {
   if (activeShareId) {
     return (
       <>
-        <SharedCollectionView
-          shareId={activeShareId}
-          themeMode={settings.themeMode || 'dark'}
-          onToggleThemeMode={() =>
-            handleUpdateSettings({
-              themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
-            })
-          }
-          onExitShareView={handleExitShareView}
-          onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
-        />
-        <WebsitePreviewModal
-          bookmark={previewingBookmark}
-          category={null}
-          subcategory={null}
-          onClose={() => setPreviewingBookmark(null)}
-        />
+        <Suspense fallback={null}>
+          <SharedCollectionView
+            shareId={activeShareId}
+            themeMode={settings.themeMode || 'dark'}
+            onToggleThemeMode={() =>
+              handleUpdateSettings({
+                themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
+              })
+            }
+            onExitShareView={handleExitShareView}
+            onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
+          />
+        </Suspense>
+        <Deferred when={previewingBookmark !== null}>
+          <WebsitePreviewModal
+            bookmark={previewingBookmark}
+            category={null}
+            subcategory={null}
+            onClose={() => setPreviewingBookmark(null)}
+          />
+        </Deferred>
       </>
     );
   }
@@ -3234,51 +3301,59 @@ export default function App() {
         {/* Main Viewport */}
         <main className="flex-1 min-w-0 space-y-5">
           {activeView === 'categories' ? (
-            <CategoriesPage
-              onBackToDirectory={() => setActiveView('all')}
-              onSelectCategoryInDirectory={(catId, subId) => {
-                setSelectedCategoryId(catId);
-                setSelectedSubcategoryId(subId || 'all');
-                setActiveView('all');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              categories={categories}
-              bookmarks={bookmarks}
-              sharedByCategoryId={sharedByCategoryId}
-              onOpenShareModal={(cat) => setSharingCategory(cat)}
-              onCreateCategory={async (name, icon, parentId) => {
-                await handleCreateCategory(name, icon, parentId);
-              }}
-              onUpdateCategory={handleUpdateCategory}
-              onDeleteCategory={handleDeleteCategory}
-              onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
-            />
+            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
+                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
+              </div>}>
+              <CategoriesPage
+                onBackToDirectory={() => setActiveView('all')}
+                onSelectCategoryInDirectory={(catId, subId) => {
+                  setSelectedCategoryId(catId);
+                  setSelectedSubcategoryId(subId || 'all');
+                  setActiveView('all');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                categories={categories}
+                bookmarks={bookmarks}
+                sharedByCategoryId={sharedByCategoryId}
+                onOpenShareModal={(cat) => setSharingCategory(cat)}
+                onCreateCategory={async (name, icon, parentId) => {
+                  await handleCreateCategory(name, icon, parentId);
+                }}
+                onUpdateCategory={handleUpdateCategory}
+                onDeleteCategory={handleDeleteCategory}
+                onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
+              />
+            </Suspense>
           ) : activeView === 'settings' || activeView === 'chrome-sync' ? (
-            <SettingsPage
-              onBackToDirectory={() => setActiveView('all')}
-              settings={settings}
-              onUpdateSettings={handleUpdateSettings}
-              user={user}
-              onSignIn={async () => openAuthPage('login')}
-              onSignOut={handleSignOut}
-              onResetDefaults={handleClearEntireWorkspace}
-              existingCategoryCount={categories.length}
-              existingBookmarkCount={bookmarks.length}
-              categories={categories}
-              bookmarks={bookmarks}
-              quickShortcuts={quickShortcuts}
-              onImportExactPlan={handleImportExactChromePlan}
-              onClearEntireWorkspace={handleClearEntireWorkspace}
-              defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
-              linkedChromeFileName={linkedChromeFileName}
-              lastChromeSyncTime={lastChromeSyncTime}
-              autoWatchChromeFile={autoWatchChromeFile}
-              onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
-              onLinkLiveChromeFile={handleLinkLiveChromeFile}
-              onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
-              onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
-              onOpenImportModal={() => setIsChromeImportModalOpen(true)}
-            />
+            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
+                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
+              </div>}>
+              <SettingsPage
+                onBackToDirectory={() => setActiveView('all')}
+                settings={settings}
+                onUpdateSettings={handleUpdateSettings}
+                user={user}
+                onSignIn={async () => openAuthPage('login')}
+                onSignOut={handleSignOut}
+                onResetDefaults={handleClearEntireWorkspace}
+                existingCategoryCount={categories.length}
+                existingBookmarkCount={bookmarks.length}
+                categories={categories}
+                bookmarks={bookmarks}
+                quickShortcuts={quickShortcuts}
+                onImportExactPlan={handleImportExactChromePlan}
+                onClearEntireWorkspace={handleClearEntireWorkspace}
+                defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
+                linkedChromeFileName={linkedChromeFileName}
+                lastChromeSyncTime={lastChromeSyncTime}
+                autoWatchChromeFile={autoWatchChromeFile}
+                onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
+                onLinkLiveChromeFile={handleLinkLiveChromeFile}
+                onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+                onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
+                onOpenImportModal={() => setIsChromeImportModalOpen(true)}
+              />
+            </Suspense>
           ) : (
             <>
               {/* Unified Top Header (matching Settings & Categories page header style) */}
@@ -4211,76 +4286,89 @@ export default function App() {
       </nav>
 
       {/* Modals for Saving/Editing or Moving a Website */}
-      <BookmarkModal
-        isOpen={isBookmarkModalOpen}
-        onClose={() => {
-          setIsBookmarkModalOpen(false);
-          setEditingBookmark(null);
-        }}
-        onSave={handleSaveBookmark}
-        onQuickCreateCategory={(name, parentId) =>
-          handleCreateCategory(name, '', parentId)
-        }
-        categories={categories}
-        initialBookmark={editingBookmark}
-        defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
-        defaultSubcategoryId={
-          selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
-        }
-      />
+      <Deferred when={isBookmarkModalOpen}>
+        <BookmarkModal
+          isOpen={isBookmarkModalOpen}
+          onClose={() => {
+            setIsBookmarkModalOpen(false);
+            setEditingBookmark(null);
+          }}
+          onSave={handleSaveBookmark}
+          onQuickCreateCategory={(name, parentId) =>
+            handleCreateCategory(name, '', parentId)
+          }
+          categories={categories}
+          initialBookmark={editingBookmark}
+          defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
+          defaultSubcategoryId={
+            selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
+          }
+        />
+      </Deferred>
 
-      <MoveWebsiteModal
-        isOpen={bookmarksToMove.length > 0}
-        onClose={() => setBookmarksToMove([])}
-        bookmarksToMove={bookmarksToMove}
-        categories={categories}
-        onConfirmMove={handleMoveWebsites}
-      />
+      <Deferred when={bookmarksToMove.length > 0}>
+        <MoveWebsiteModal
+          isOpen={bookmarksToMove.length > 0}
+          onClose={() => setBookmarksToMove([])}
+          bookmarksToMove={bookmarksToMove}
+          categories={categories}
+          onConfirmMove={handleMoveWebsites}
+        />
+      </Deferred>
 
-      <BatchEditModal
-        isOpen={bookmarksToBatchEdit.length > 0}
-        onClose={() => setBookmarksToBatchEdit([])}
-        bookmarksToEdit={bookmarksToBatchEdit}
-        categories={categories}
-        onConfirmBatchEdit={handleBatchEditWebsites}
-      />
+      <Deferred when={bookmarksToBatchEdit.length > 0}>
+        <BatchEditModal
+          isOpen={bookmarksToBatchEdit.length > 0}
+          onClose={() => setBookmarksToBatchEdit([])}
+          bookmarksToEdit={bookmarksToBatchEdit}
+          categories={categories}
+          onConfirmBatchEdit={handleBatchEditWebsites}
+        />
+      </Deferred>
 
-      <WebsitePreviewModal
-        bookmark={previewingBookmark}
-        category={
-          previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
-        }
-        subcategory={
-          previewingBookmark?.subcategoryId
-            ? categoryMap[previewingBookmark.subcategoryId] || null
-            : null
-        }
-        onClose={() => setPreviewingBookmark(null)}
-      />
+      <Deferred when={previewingBookmark !== null}>
+        <WebsitePreviewModal
+          bookmark={previewingBookmark}
+          category={
+            previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
+          }
+          subcategory={
+            previewingBookmark?.subcategoryId
+              ? categoryMap[previewingBookmark.subcategoryId] || null
+              : null
+          }
+          onClose={() => setPreviewingBookmark(null)}
+        />
+      </Deferred>
 
-      <QuickShortcutModal
-        isOpen={isShortcutModalOpen}
-        onClose={() => {
-          setIsShortcutModalOpen(false);
-          setEditingShortcut(null);
-        }}
-        onSave={handleSaveQuickShortcut}
-        onDelete={handleDeleteQuickShortcut}
-        bookmarks={bookmarks}
-        initialShortcut={editingShortcut}
-      />
+      <Deferred when={isShortcutModalOpen}>
+        <QuickShortcutModal
+          isOpen={isShortcutModalOpen}
+          onClose={() => {
+            setIsShortcutModalOpen(false);
+            setEditingShortcut(null);
+          }}
+          onSave={handleSaveQuickShortcut}
+          onDelete={handleDeleteQuickShortcut}
+          bookmarks={bookmarks}
+          initialShortcut={editingShortcut}
+        />
+      </Deferred>
 
-      <ChromeImportModal
-        isOpen={isChromeImportModalOpen}
-        onClose={() => setIsChromeImportModalOpen(false)}
-        onImportExactPlan={handleImportExactChromePlan}
-        linkedChromeFileName={linkedChromeFileName}
-        lastChromeSyncTime={lastChromeSyncTime}
-        onLinkLiveChromeFile={handleLinkLiveChromeFile}
-        onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
-      />
+      <Deferred when={isChromeImportModalOpen}>
+        <ChromeImportModal
+          isOpen={isChromeImportModalOpen}
+          onClose={() => setIsChromeImportModalOpen(false)}
+          onImportExactPlan={handleImportExactChromePlan}
+          linkedChromeFileName={linkedChromeFileName}
+          lastChromeSyncTime={lastChromeSyncTime}
+          onLinkLiveChromeFile={handleLinkLiveChromeFile}
+          onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+        />
+      </Deferred>
 
       {sharingCategory && (
+        <Suspense fallback={null}>
         <ShareCategoryModal
           category={sharingCategory}
           subcategories={subcategoriesByParent[sharingCategory.id] || []}
@@ -4296,54 +4384,59 @@ export default function App() {
           onPreviewSharedPage={handleOpenSharePreview}
           onClose={() => setSharingCategory(null)}
         />
+        </Suspense>
       )}
 
       <SignInLoadingOverlay stage={signInLoadingStage} />
 
-      <AccountSyncModal
-        isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
-        userEmail={pendingSyncChoice?.targetUser.email || ''}
-        userName={pendingSyncChoice?.targetUser.displayName}
-        hasLocalData={Boolean(
-          pendingSyncChoice &&
-            (pendingSyncChoice.localCategories.length > 0 ||
-              pendingSyncChoice.localBookmarks.length > 0 ||
-              pendingSyncChoice.localShortcuts.length > 0)
-        )}
-        hasCloudData={Boolean(
-          pendingSyncChoice &&
-            (pendingSyncChoice.cloudCategories.length > 0 ||
-              pendingSyncChoice.cloudBookmarks.length > 0 ||
-              pendingSyncChoice.cloudShortcuts.length > 0)
-        )}
-        localCounts={{
-          categories: pendingSyncChoice?.localCategories.length || 0,
-          bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
-          shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
-        }}
-        cloudCounts={{
-          categories: pendingSyncChoice?.cloudCategories.length || 0,
-          bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
-          shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
-        }}
-        isProcessing={isSyncChoiceProcessing}
-        error={syncChoiceError}
-        onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
-        onKeepLocalOnly={handleChoiceKeepLocalOnly}
-        onGetCloudAndSync={handleChoiceGetCloudAndSync}
-        onStartFresh={handleChoiceStartFresh}
-      />
+      <Deferred when={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}>
+        <AccountSyncModal
+          isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
+          userEmail={pendingSyncChoice?.targetUser.email || ''}
+          userName={pendingSyncChoice?.targetUser.displayName}
+          hasLocalData={Boolean(
+            pendingSyncChoice &&
+              (pendingSyncChoice.localCategories.length > 0 ||
+                pendingSyncChoice.localBookmarks.length > 0 ||
+                pendingSyncChoice.localShortcuts.length > 0)
+          )}
+          hasCloudData={Boolean(
+            pendingSyncChoice &&
+              (pendingSyncChoice.cloudCategories.length > 0 ||
+                pendingSyncChoice.cloudBookmarks.length > 0 ||
+                pendingSyncChoice.cloudShortcuts.length > 0)
+          )}
+          localCounts={{
+            categories: pendingSyncChoice?.localCategories.length || 0,
+            bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
+            shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
+          }}
+          cloudCounts={{
+            categories: pendingSyncChoice?.cloudCategories.length || 0,
+            bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
+            shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
+          }}
+          isProcessing={isSyncChoiceProcessing}
+          error={syncChoiceError}
+          onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
+          onKeepLocalOnly={handleChoiceKeepLocalOnly}
+          onGetCloudAndSync={handleChoiceGetCloudAndSync}
+          onStartFresh={handleChoiceStartFresh}
+        />
+      </Deferred>
 
-      <AuthPage
-        isOpen={Boolean(authPageMode && !user)}
-        mode={authPageMode || 'login'}
-        onModeChange={(nextMode) => setAuthPageMode(nextMode)}
-        onClose={closeAuthPage}
-        onGoogleLogin={handleGoogleLogin}
-        onEmailLogin={handleEmailLogin}
-        onEmailRegister={handleEmailRegister}
-        onPasswordReset={handlePasswordReset}
-      />
+      <Deferred when={Boolean(authPageMode && !user)}>
+        <AuthPage
+          isOpen={Boolean(authPageMode && !user)}
+          mode={authPageMode || 'login'}
+          onModeChange={(nextMode) => setAuthPageMode(nextMode)}
+          onClose={closeAuthPage}
+          onGoogleLogin={handleGoogleLogin}
+          onEmailLogin={handleEmailLogin}
+          onEmailRegister={handleEmailRegister}
+          onPasswordReset={handlePasswordReset}
+        />
+      </Deferred>
     </div>
   );
 }

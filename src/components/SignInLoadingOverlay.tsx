@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Bookmark, Cloud, Globe, Link2, Star, Folder } from 'lucide-react';
-import myFavLogoImg from '../assets/images/myfav_app_logo_1794774931445.jpg';
+import myFavLogoImg from '../assets/images/myfav_app_logo_160.webp';
 
 export type SignInLoadingStage = 'signing-in' | 'syncing' | 'loading';
 
