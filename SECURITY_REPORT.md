@@ -59,6 +59,11 @@ Plus, live on Neon:
 - An inconsistent tree move rolls back. Batch edit to an invalid target is all-or-nothing. **PASS**
 - Live on Neon, the import RPC (which uses a temp table) ran successfully as `authenticated`, with correct merge, duplicate and invalid-URL counts.
 
+## Client-side fix: sign-out left cloud data on the page and in guest storage (2026-11-17)
+- **Cause:** the original app's sign-out handler kept the in-memory workspace when the user became `null`. The guest auto-save effects then wrote that cloud workspace into this browser's guest `localStorage`, where it survived reloads.
+- **Fix (`src/App.tsx`):** on a signed-in → signed-out change in the same tab, the page reloads the guest workspace from storage in the same render batch as `setUser(null)`, so cloud data is never auto-saved as guest data. Signing out of a cloud-linked account also resets guest storage to empty, which removes any copy left by the earlier bug. Guest data of an account that was never linked is kept.
+- **Tests:** `tests/unit/signOutFlow.test.tsx` (3 tests) renders the whole app. With the fix reverted, 2 of the 3 fail.
+
 ## Residual risks / required settings
 - **Not verified end-to-end in a browser:** JWT issuance by Neon Auth → Data API → RLS. This environment cannot reach Neon over HTTP. Every database rule was verified live by setting the same JWT claims the Data API sets. Please run the app locally (README §1) for the final browser check.
 - `auth.uid()`'s fallback to `request.jwt.claims` applies to **direct** database sessions only. The Data API validates real JWTs. Never give end users a direct Postgres role.

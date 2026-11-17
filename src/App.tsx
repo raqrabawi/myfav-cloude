@@ -119,6 +119,56 @@ function generateCleanId(prefix: string): string {
   return `${prefix}_${Date.now()}_${randomPart}`;
 }
 
+
+// Guest (signed-out) workspace as stored in this browser. Used on first load
+// and again on sign-out, so a signed-out page never keeps showing cloud data.
+function readLocalCategories(): CategoryItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    if (saved) {
+      const parsed: CategoryItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((c) => !DEMO_CATEGORY_IDS.has(c.id));
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return INITIAL_CATEGORIES;
+}
+
+function readLocalBookmarks(): BookmarkItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
+    if (saved) {
+      const parsed: BookmarkItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (b) => !DEMO_BOOKMARK_IDS.has(b.id) && !DEMO_CATEGORY_IDS.has(b.categoryId)
+        );
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return INITIAL_BOOKMARKS;
+}
+
+function readLocalQuickShortcuts(): QuickShortcutItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.QUICK_SHORTCUTS);
+    if (saved) {
+      const parsed: QuickShortcutItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => a.order - b.order);
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return [];
+}
+
 export default function App() {
   // Auth & Cloud Sync Gate State
   const [user, setUser] = useState<User | null>(null);
@@ -141,37 +191,9 @@ export default function App() {
   const [syncChoiceError, setSyncChoiceError] = useState('');
 
   // Local / Synced Data State — automatically purges all previous demo categories, subcategories, and websites
-  const [categories, setCategories] = useState<CategoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-      if (saved) {
-        const parsed: CategoryItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((c) => !DEMO_CATEGORY_IDS.has(c.id));
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return INITIAL_CATEGORIES;
-  });
+  const [categories, setCategories] = useState<CategoryItem[]>(readLocalCategories);
 
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
-      if (saved) {
-        const parsed: BookmarkItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (b) => !DEMO_BOOKMARK_IDS.has(b.id) && !DEMO_CATEGORY_IDS.has(b.categoryId)
-          );
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return INITIAL_BOOKMARKS;
-  });
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(readLocalBookmarks);
 
   const [settings, setSettings] = useState<UserSettings>(() => {
     try {
@@ -192,20 +214,7 @@ export default function App() {
     };
   });
 
-  const [quickShortcuts, setQuickShortcuts] = useState<QuickShortcutItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.QUICK_SHORTCUTS);
-      if (saved) {
-        const parsed: QuickShortcutItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.sort((a, b) => a.order - b.order);
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return [];
-  });
+  const [quickShortcuts, setQuickShortcuts] = useState<QuickShortcutItem[]>(readLocalQuickShortcuts);
 
   const localCategoriesRef = useRef<CategoryItem[]>(categories);
   const localBookmarksRef = useRef<BookmarkItem[]>(bookmarks);
@@ -471,6 +480,15 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
+      // A cloud-linked account empties guest storage when it links, and guest
+      // auto-save is off while signed in, so anything there now is a copy of
+      // cloud data left by the earlier same-tab sign-out bug. Reset it so the
+      // signed-out page shows an empty guest workspace, as after linking.
+      if (user && localStorage.getItem(STORAGE_KEYS.CLOUD_LINKED_UID) === user.uid) {
+        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.QUICK_SHORTCUTS, JSON.stringify([]));
+      }
       localStorage.removeItem(STORAGE_KEYS.CLOUD_LINKED_UID);
     } catch {
       // ignore
@@ -480,6 +498,8 @@ export default function App() {
     await signOutUser();
   };
 
+  const wasSignedInRef = useRef(false);
+
   // Supabase Auth listener (Firebase-compatible facade) with pre-sync decision gate on login
   useEffect(() => {
     let cancelled = false;
@@ -488,6 +508,19 @@ export default function App() {
 
       if (!currentUser) {
         freshSignInTriggeredRef.current = false;
+        if (wasSignedInRef.current) {
+          // Signed in -> signed out in this tab: drop the cloud workspace from
+          // the screen and show this browser's guest workspace, exactly what a
+          // reload shows. Done in the same batch as setUser(null) so the guest
+          // auto-save effects never write cloud data into guest storage.
+          wasSignedInRef.current = false;
+          setCategories(readLocalCategories());
+          setBookmarks(readLocalBookmarks());
+          setQuickShortcuts(readLocalQuickShortcuts());
+          setActiveView('all');
+          setSelectedCategoryId('all');
+          setSelectedSubcategoryId('all');
+        }
         setUser(null);
         setAuthReady(true);
         setSyncGateStatus('idle');
@@ -496,6 +529,7 @@ export default function App() {
         return;
       }
 
+      wasSignedInRef.current = true;
       setUser(currentUser);
       setAuthReady(true);
 
