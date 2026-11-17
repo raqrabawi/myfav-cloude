@@ -41,12 +41,19 @@ const cloudWorkspace = {
   sharedCategories: [],
   settings: null,
 };
-vi.mock('../../src/lib/apiClient', () => ({
-  apiClient: new Proxy(
-    { getWorkspace: vi.fn(async () => cloudWorkspace) },
-    { get: (t, k) => (k in t ? (t as Record<string, unknown>)[k as string] : vi.fn(async () => undefined)) }
-  ),
+const api = vi.hoisted(() => ({
+  getWorkspace: undefined as unknown as ReturnType<typeof import('vitest').vi.fn>,
+  syncLocalWorkspace: undefined as unknown as ReturnType<typeof import('vitest').vi.fn>,
 }));
+vi.mock('../../src/lib/apiClient', () => {
+  api.getWorkspace = vi.fn(async () => cloudWorkspace);
+  api.syncLocalWorkspace = vi.fn(async () => cloudWorkspace);
+  return {
+    apiClient: new Proxy(api as Record<string, unknown>, {
+      get: (t, k) => (k in t ? t[k as string] : vi.fn(async () => undefined)),
+    }),
+  };
+});
 
 const KEYS = {
   CATEGORIES: 'aethermark_categories_v1',
@@ -66,6 +73,8 @@ let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
+  api.getWorkspace?.mockClear();
+  api.syncLocalWorkspace?.mockClear();
   localStorage.clear();
   sessionStorage.clear();
   authState.cb = null;
@@ -134,15 +143,46 @@ describe('sign-out in the same tab', () => {
     expect(guestBookmarks()).toEqual([]);
   });
 
-  it('keeps real guest data when the account was never linked', async () => {
-    const guest = [{ ...cloudWorkspace.bookmarks[0], id: 'g1', ownerId: 'local', title: 'Guest Only Site', url: 'https://guest.example', categoryId: 'gc' }];
-    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify([{ ...cloudWorkspace.categories[0], id: 'gc', ownerId: 'local', name: 'Guest Category' }]));
-    localStorage.setItem(KEYS.BOOKMARKS, JSON.stringify(guest));
-
-    await renderSignedIn(); // not linked -> sync-choice gate, cloud data not shown yet
+  it('signing out after an automatic sync shows an empty guest workspace', async () => {
+    localStorage.setItem(KEYS.BOOKMARKS, JSON.stringify([{ ...cloudWorkspace.bookmarks[0], id: 'g1', ownerId: 'local', title: 'Guest Only Site', url: 'https://guest.example', categoryId: '' }]));
+    await renderSignedIn();
     await clickSignOut();
-    expect(host.textContent).toContain('Guest Only Site');
     expect(host.textContent).not.toContain('Cloud Secret Site');
+    expect(guestBookmarks()).toEqual([]);
+  });
+});
+
+describe('sign-in with existing data: automatic sync, no prompt', () => {
+  const guestBookmark = { ...cloudWorkspace.bookmarks[0], id: 'g1', ownerId: 'local', title: 'Guest Only Site', url: 'https://guest.example', categoryId: '' };
+
+  it('merges this device\'s websites into the account and opens the Main Page without asking', async () => {
+    localStorage.setItem(KEYS.BOOKMARKS, JSON.stringify([guestBookmark]));
+    await renderSignedIn();
+
+    expect(api.syncLocalWorkspace).toHaveBeenCalledTimes(1);
+    expect(api.syncLocalWorkspace.mock.calls[0][0].bookmarks.map((b: { id: string }) => b.id)).toEqual(['g1']);
+    expect(host.textContent).not.toMatch(/Sync Local|Keep Local|Start Fresh|Choose how/i);
+    expect(host.textContent).toContain('Cloud Secret Site');
+    expect(host.textContent).toContain('Main Page');
+    expect(localStorage.getItem(KEYS.LINKED)).toBe('u1');
+    expect(guestBookmarks()).toEqual([]);
+  });
+
+  it('with no local data, just opens the cloud workspace (nothing to upload)', async () => {
+    await renderSignedIn();
+    expect(api.syncLocalWorkspace).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Cloud Secret Site');
+    expect(localStorage.getItem(KEYS.LINKED)).toBe('u1');
+  });
+
+  it('if the automatic sync fails, the device copy is kept and the browser is not linked', async () => {
+    localStorage.setItem(KEYS.BOOKMARKS, JSON.stringify([guestBookmark]));
+    api.syncLocalWorkspace.mockRejectedValueOnce(new Error('network down'));
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await renderSignedIn();
+    err.mockRestore();
+    expect(localStorage.getItem(KEYS.LINKED)).toBeNull();
     expect(guestBookmarks().map((b: { id: string }) => b.id)).toEqual(['g1']);
+    expect(host.textContent).toContain("Couldn't sync this device's websites yet");
   });
 });

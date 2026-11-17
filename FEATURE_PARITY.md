@@ -85,7 +85,7 @@ UI source note: all 17 original components except `ShareCategoryModal`, `Setting
 | `GET /api/health`, `GET *` SPA fallback | Not used by the UI; SPA fallback is a host setting (see README) | — | n/a |
 
 ## Deliberate, documented behaviour differences
-1. **Google sign-in is a redirect, not a popup.** The UI is unchanged. The "fresh sign-in" marker survives the round trip in `sessionStorage`, so the AccountSyncModal still appears exactly as before.
+1. **Google sign-in is a redirect, not a popup.** The UI is unchanged. The "fresh sign-in" marker survives the round trip in `sessionStorage`, so a fresh sign-in is still detected. (Since 2026-11-17 the AccountSyncModal is no longer shown; see the change below.)
 2. **Email verification uses a 6-digit code.** Neon's shared email sender supports codes, not verification links. After sign-up, or after signing in with an unverified email, a small code dialog opens (new screen). Once the code is accepted the user is signed in automatically. With a custom email provider, links become possible.
 3. **Minimum password length is 8** (Neon Better Auth default). The original Firebase minimum was 6, and AuthPage's unchanged pre-check still says 6. For 6–7 characters the server's message explains the real 8-character rule.
 4. **Password recovery** uses a new in-app dialog fed by the `?token=` reset link. Firebase hosted this page itself.
@@ -94,3 +94,12 @@ UI source note: all 17 original components except `ShareCategoryModal`, `Setting
 7. **Stricter integrity.** Writes that would have produced orphaned or 3-level or cross-tenant data are rejected and rolled back. For sync-local, a bookmark whose "category" is a subcategory is re-homed under its root. On realistic inputs the differential tests show identical outcomes.
 8. **IDs are unique per owner** (composite keys), not globally.
 9. **Existing users can't be migrated.** Firebase password users cannot be moved, because the password hashes are incompatible. Not relevant yet, since V2 has no production users.
+
+
+## Intentional behaviour change (2026-11-17): automatic sync on sign-in
+At the owner's request, signing in no longer opens the AccountSyncModal ("Sync local → cloud / Keep local only / Get cloud & sync / Start fresh").
+- If this browser has guest data, it is merged into the account through `myfav_sync_local_workspace`. The merge never deletes anything and skips duplicates: websites by URL, categories by name.
+- The browser is then linked, guest storage is emptied, and the **Main Page** opens with the account's workspace.
+- If the merge fails, the browser is not linked and the guest copy stays on the device. A toast says so, and the merge is retried at the next sign-in.
+- "Keep local only" and "Start fresh" are no longer offered at sign-in. Clearing the workspace is still available in Settings.
+- Tests: `tests/unit/signOutFlow.test.tsx` (3 sign-in cases).

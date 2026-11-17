@@ -1,6 +1,6 @@
 diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
 --- orig/MyFav-main/src/App.tsx	2026-11-16 12:33:49.000000000 +0300
-+++ myfav-cloude/src/App.tsx	2026-11-17 19:18:34.227749038 +0300
++++ myfav-cloude/src/App.tsx	2026-11-17 23:16:59.329759063 +0300
 @@ -39,17 +39,16 @@
    LogIn,
  } from 'lucide-react';
@@ -209,7 +209,82 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        freshSignInTriggeredRef.current = false;
  
        // Returning session for already-linked account: attach listeners seamlessly
-@@ -551,7 +587,7 @@
+@@ -517,31 +553,57 @@
+         return;
+       }
+ 
+-      // Fresh Google login or unlinked account: inspect local vs cloud data and prompt user
++      // Fresh login or unlinked account: no prompt. Merge this browser's guest
++      // workspace into the account (server de-duplicates websites by URL and
++      // categories by name), link the browser, then open the Main Page with the
++      // combined cloud workspace.
+       setSyncGateStatus('checking');
+       setCloudLoading(true);
+       setSyncChoiceError('');
++      setPendingSyncChoice(null);
+ 
++      const localCategories = localCategoriesRef.current;
++      const localBookmarks = localBookmarksRef.current;
++      const localShortcuts = localQuickShortcutsRef.current;
++      const hasLocalData =
++        localCategories.length > 0 || localBookmarks.length > 0 || localShortcuts.length > 0;
++
++      let syncFailed = false;
+       try {
+-        const cloudData = await apiClient.getWorkspace();
++        if (hasLocalData) {
++          await apiClient.syncLocalWorkspace({
++            categories: localCategories,
++            bookmarks: localBookmarks,
++            quickShortcuts: localShortcuts,
++          });
++        }
+         if (cancelled) return;
+-
+-        setPendingSyncChoice({
+-          targetUser: currentUser,
+-          localCategories: localCategoriesRef.current,
+-          localBookmarks: localBookmarksRef.current,
+-          localShortcuts: localQuickShortcutsRef.current,
+-          cloudCategories: cloudData.categories,
+-          cloudBookmarks: cloudData.bookmarks,
+-          cloudShortcuts: cloudData.quickShortcuts,
+-        });
+-        setSyncGateStatus('awaiting_choice');
+-        setCloudLoading(false);
++        try {
++          localStorage.setItem(STORAGE_KEYS.CLOUD_LINKED_UID, currentUser.uid);
++          localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
++          localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify([]));
++          localStorage.setItem(STORAGE_KEYS.QUICK_SHORTCUTS, JSON.stringify([]));
++        } catch {
++          // ignore
++        }
+       } catch (error) {
+         if (cancelled) return;
+-        setCloudLoading(false);
+-        setSyncGateStatus('ready');
+-        console.error('Could not check existing cloud data:', error);
++        // Not linked: the guest copy stays in this browser and the merge is
++        // retried on the next sign-in. Nothing is lost.
++        syncFailed = true;
++        console.error('Automatic sync of local data failed:', error);
++      }
++
++      setActiveView('all');
++      setSelectedCategoryId('all');
++      setSelectedSubcategoryId('all');
++      setSyncGateStatus('ready');
++      if (syncFailed) {
++        setLiveSyncToast("Couldn't sync this device's websites yet. They're kept here and will sync next time you log in.");
++        setTimeout(() => setLiveSyncToast(null), 5000);
++      } else if (hasLocalData) {
++        setLiveSyncToast('Synced your websites to your account');
++        setTimeout(() => setLiveSyncToast(null), 3500);
+       }
+     });
+ 
+@@ -551,7 +613,7 @@
      };
    }, []);
  
@@ -218,7 +293,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    useEffect(() => {
      if (!authReady || !user || syncGateStatus !== 'ready') {
        if (!user) {
-@@ -2126,7 +2162,7 @@
+@@ -2126,7 +2188,7 @@
        );
      }
  
@@ -227,7 +302,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
      if (user) {
        let extraIdx = reorderedSiblings.length;
        await apiClient.reorderCategoryTree({
-@@ -2233,7 +2269,7 @@
+@@ -2233,7 +2295,7 @@
            <MyFavLogo size="md" />
          </a>
  
@@ -236,7 +311,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300 ml-auto">
            {liveSyncToast && (
              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-@@ -2262,7 +2298,7 @@
+@@ -2262,7 +2324,7 @@
                    : 'text-slate-400'
                }`}
              />
@@ -245,7 +320,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
            </button>
  
            <button
-@@ -2355,7 +2391,7 @@
+@@ -2355,7 +2417,7 @@
  
                  {/* Scrollable Category & Subcategory Tree */}
                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-2.5">
@@ -254,7 +329,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <button
                      type="button"
                      onClick={() => {
-@@ -2379,7 +2415,7 @@
+@@ -2379,7 +2441,7 @@
                        >
                          <Bookmark className="w-4 h-4" strokeWidth={2.1} />
                        </span>
@@ -263,7 +338,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                      </div>
                      <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[10px] font-mono-tabular text-slate-400">
                        {bookmarks.length}
-@@ -2883,7 +2919,7 @@
+@@ -2883,7 +2945,7 @@
  
                  {/* Vertical Enhanced Category Icons List */}
                  <div className="flex-1 overflow-y-auto space-y-2.5 py-3 w-full flex flex-col items-center no-scrollbar">
@@ -272,7 +347,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <div className="relative flex flex-col items-center w-full">
                      {activeView === 'all' && selectedCategoryId === 'all' && (
                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full accent-bg shadow-[0_0_10px_var(--accent-primary)]" />
-@@ -2895,8 +2931,8 @@
+@@ -2895,8 +2957,8 @@
                          setSelectedCategoryId('all');
                          setSelectedSubcategoryId('all');
                        }}
@@ -283,7 +358,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                        className={`group/icon relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                          activeView === 'all' && selectedCategoryId === 'all'
                            ? 'accent-bg text-white shadow-[0_6px_16px_rgba(var(--accent-rgb),0.35)] scale-105'
-@@ -3210,7 +3246,7 @@
+@@ -3210,7 +3272,7 @@
                        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-1.5"
                      >
                        <ArrowLeft className="w-3.5 h-3.5" />
