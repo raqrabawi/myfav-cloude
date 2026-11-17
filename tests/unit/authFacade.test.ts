@@ -168,6 +168,42 @@ describe('sign-in / registration flows', () => {
     expect(fakeAuth.signOut).toHaveBeenCalled();
   });
 
+  it('sign-out updates the SAME tab even though Neon only broadcasts it to other tabs', async () => {
+    const seen: Array<string | null> = [];
+    const unsub = authMod.onAuthStateChanged(authMod.auth, (u) => seen.push(u ? u.uid : null));
+    listeners[listeners.length - 1]('INITIAL_SESSION', session('u1'));
+    await flush();
+    // The adapter emits nothing to this tab on sign-out (localStorage broadcast).
+    await authMod.signOutUser();
+    await flush();
+    expect(seen).toEqual(['u1', null]);
+    unsub();
+  });
+
+  it('a failed sign-out keeps the user signed in and reports the error', async () => {
+    const seen: Array<string | null> = [];
+    const unsub = authMod.onAuthStateChanged(authMod.auth, (u) => seen.push(u ? u.uid : null));
+    listeners[listeners.length - 1]('INITIAL_SESSION', session('u1'));
+    await flush();
+    fakeAuth.signOut.mockResolvedValueOnce({ error: { message: 'Failed to fetch' } } as never);
+    await expect(authMod.signOutUser()).rejects.toMatchObject({ code: 'auth/network-request-failed' });
+    await flush();
+    expect(seen).toEqual(['u1']);
+    unsub();
+  });
+
+  it('email sign-in updates the SAME tab without waiting for a reload', async () => {
+    const seen: Array<string | null> = [];
+    const unsub = authMod.onAuthStateChanged(authMod.auth, (u) => seen.push(u ? u.uid : null));
+    listeners[listeners.length - 1]('INITIAL_SESSION', null);
+    await flush();
+    fakeAuth.signInWithPassword.mockResolvedValueOnce({ data: { ...session('u5'), session: {} }, error: null });
+    await authMod.signInWithEmail('u5@x.dev', 'password123');
+    await flush();
+    expect(seen).toEqual([null, 'u5']);
+    unsub();
+  });
+
   it('sign-up needing verification opens the code dialog and signs in after the code is verified', async () => {
     const seen: string[] = [];
     const onEvt = (e: Event) => seen.push((e as CustomEvent<{ email: string }>).detail.email);

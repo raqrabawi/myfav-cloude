@@ -96,6 +96,22 @@ export function toFacadeUser(u: AdapterUser | null | undefined): User | null {
  * Token refreshes and profile updates do NOT re-fire it, so App's sync gate is
  * never re-triggered by background refreshes.
  */
+/**
+ * Neon's adapter announces SIGNED_IN / SIGNED_OUT through Better Auth's
+ * localStorage "broadcast channel", whose `storage` events reach only OTHER
+ * tabs. The tab that actually signed in or out is never told, so we notify
+ * our own listeners directly after those calls succeed.
+ */
+const localEmitters = new Set<(session: AdapterSession | null) => void>();
+function notifyLocal(session: AdapterSession | null) {
+  localEmitters.forEach((emit) => emit(session));
+}
+/** After a successful password sign-in; never treats a user-less reply as sign-out. */
+function notifySignedIn(data: unknown) {
+  const s = data as AdapterSession | null | undefined;
+  if (s?.user?.id) notifyLocal(s);
+}
+
 export function onAuthStateChanged(
   _auth: AuthFacade,
   callback: (user: User | null) => void
@@ -133,9 +149,11 @@ export function onAuthStateChanged(
   const { data } = neon.auth.onAuthStateChange((_event: string, session: unknown) =>
     emit(session as AdapterSession | null)
   );
+  localEmitters.add(emit);
 
   return () => {
     disposed = true;
+    localEmitters.delete(emit);
     data.subscription.unsubscribe();
   };
 }
@@ -260,6 +278,7 @@ export async function signInWithEmail(email: string, password: string) {
     }
     throw mapped;
   }
+  notifySignedIn(data);
   return data;
 }
 
@@ -318,6 +337,7 @@ export async function registerWithEmail(name: string, email: string, password: s
   // adapter so onAuthStateChange fires like any other sign-in.
   const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw mapAuthError(error);
+  notifySignedIn(data);
   return data;
 }
 
@@ -387,7 +407,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<{ si
   } catch {
     // ignore
   }
-  const { error } = await requireNeon().auth.signInWithPassword({
+  const { data, error } = await requireNeon().auth.signInWithPassword({
     email: pending.email,
     password: pending.password,
   });
@@ -399,6 +419,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<{ si
     }
     return { signedIn: false };
   }
+  notifySignedIn(data);
   return { signedIn: true };
 }
 
@@ -455,4 +476,5 @@ export async function signOutUser() {
   if (!neon) return;
   const { error } = await neon.auth.signOut();
   if (error) throw mapAuthError(error);
+  notifyLocal(null);
 }
