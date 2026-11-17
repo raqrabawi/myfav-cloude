@@ -9,11 +9,14 @@
  * in memory; only the user id/email/verification state and "JWT issued: yes"
  * are shown.
  *
- *   npm run auth:smoke                       # random test address
- *   npm run auth:smoke -- you+test@mail.com  # a real inbox (needed if the
- *                                            # branch requires email codes)
+ *   npm run auth:smoke -- you+test@mail.com  # real inbox; you'll be asked for
+ *                                            # the 6-digit code from the email
+ *   npm run auth:smoke                       # random @example.com address —
+ *                                            # only for branches WITHOUT
+ *                                            # required email verification
  */
 import { randomBytes } from 'node:crypto';
+import { createInterface } from 'node:readline/promises';
 
 const base = String(process.env.NEON_AUTH_BASE_URL ?? '').replace(/\/+$/, '');
 const origin = process.env.NEON_AUTH_TEST_ORIGIN || 'http://localhost:3000';
@@ -23,7 +26,7 @@ if (!allowAnyUrl && !/^https:\/\/[^/]+\.neonauth\.[^/]+\/.+\/auth$/.test(base)) 
   process.exit(2);
 }
 
-const email = process.argv[2] || `myfav.smoke.${Date.now()}@example.com`;
+const email = (process.argv[2] || `myfav.smoke.${Date.now()}@example.com`).trim();
 const password = randomBytes(18).toString('base64url'); // never printed
 const name = 'MyFav Smoke Test';
 
@@ -79,9 +82,28 @@ if (!signUp.res.ok) {
 const createdId = signUp.body?.user?.id;
 console.log(`   OK — user created: id=${createdId ?? '?'}`);
 if (!signUp.body?.token) {
-  console.log('   No session yet: this branch requires email verification.');
-  console.log('   Enter the 6-digit code in the app (or use a real inbox and the app\'s verification dialog), then sign in.');
-  process.exit(0);
+  console.log('   This branch requires email verification (6-digit code).');
+  if (!process.stdin.isTTY || /@example\.com$/i.test(email)) {
+    console.log('   Re-run with a real inbox you can read:  npm run auth:smoke -- you+test@yourmail.com');
+    process.exit(4);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const otp = (await rl.question(`   Enter the 6-digit code sent to ${email}: `)).replace(/\s+/g, '');
+  rl.close();
+  const verify = await call('/email-otp/verify-email', { method: 'POST', body: JSON.stringify({ email, otp }) });
+  if (!verify.res.ok) {
+    console.error(`   Verification FAILED (${verify.res.status}): ${redact(verify.body?.message || verify.body?.code || '')}`);
+    process.exit(1);
+  }
+  console.log('   OK — email verified');
+  if (!cookieJar.size || !verify.body?.token) {
+    const signIn = await call('/sign-in/email', { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (!signIn.res.ok) {
+      console.error(`   Sign-in FAILED (${signIn.res.status}): ${redact(signIn.body?.message || signIn.body?.code || '')}`);
+      process.exit(1);
+    }
+    console.log('   OK — signed in with email + password');
+  }
 }
 
 console.log('2) Read the current user back (GET /get-session) ...');
