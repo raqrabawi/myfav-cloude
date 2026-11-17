@@ -15,7 +15,16 @@ import { createClient } from '@neon/neon-js/supabase';
  * like the original when the cloud is unreachable.
  */
 
-const rawUrl = String(import.meta.env.VITE_NEON_URL ?? '').trim();
+/**
+ * Public HTTPS database URL of the Neon "MyFav" project, branch `production`.
+ * It is NOT a secret (no credentials; access is enforced by Neon Auth + RLS).
+ * Built in as the default so hosts that cannot inject build-time env vars
+ * (e.g. Figma Sites / Figma Make) still connect. VITE_NEON_URL overrides it
+ * (e.g. the v2-dev branch for development).
+ */
+export const DEFAULT_NEON_URL = 'https://ep-icy-firefly-be63sv9l.c-9.us-east-2.aws.neon.tech/neondb';
+
+const rawUrl = String(import.meta.env.VITE_NEON_URL || DEFAULT_NEON_URL).trim();
 
 export interface NeonEnvStatus {
   ok: boolean;

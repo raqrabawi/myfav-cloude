@@ -66,7 +66,7 @@ Host `dist/` on any static host (Vercel, Netlify, Cloudflare Pages…):
 - add the deployed origin to Neon Auth trusted domains (and the Data API CORS origins if you restrict them)
 - recommended CSP `connect-src`: `https://*.neonauth.<region>.aws.neon.tech https://*.apirest.<region>.aws.neon.tech https://www.google-analytics.com`
 
-**Figma Make:** copying this code into Figma Make does **not** configure env vars, trusted domains or the Neon project. Set those up there separately. Compatibility with Figma Make has not been verified.
+**Figma Sites / Figma Make (live: https://myfavlinks.figma.site):** these hosts don't inject build-time env vars, so the app falls back to the built-in production URL (`DEFAULT_NEON_URL` in `src/lib/neonClient.ts`). `https://myfavlinks.figma.site` is on `production`'s Neon Auth trusted domains. After changing code, re-sync it to Figma and republish.
 
 ## 4. Tests
 | Command | What |

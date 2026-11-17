@@ -86,7 +86,7 @@ export const ShareCategoryModal: React.FC<ShareCategoryModalProps> = ({
   }, [user, category.id]);
 
   const shareUrl = activeShare
-    ? `${window.location.origin}/?share=${encodeURIComponent(activeShare.id)}`
+    ? `${window.location.origin}${import.meta.env.BASE_URL}?share=${encodeURIComponent(activeShare.id)}`
     : '';
 
   const handleCopyLink = () => {
