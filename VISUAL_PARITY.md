@@ -70,3 +70,4 @@
 | Change | Where | Effect on the captures above |
 |---|---|---|
 | Navigation label "All Websites" renamed to **"Main Page"** (also the collapsed-sidebar icon tooltip/aria-label and the "Back to Main Page" link) | `src/App.tsx` | Captures showing the top menu or sidebar now differ from the original by this label text only. The 42/42 result above predates this change. |
+| New sign-in loading overlay (`SignInLoadingOverlay`) | `src/components/SignInLoadingOverlay.tsx`, `src/App.tsx` | Appears only while signing in, syncing or loading after sign-in, and only if that takes longer than 180 ms. It shows three stages ("Signing you in", "Syncing your websites", "Loading your Main Page") with an orbit-and-logo animation, an accent-coloured progress sweep and step dots. Light and dark themes supported; respects reduced-motion. Not in the original. |
