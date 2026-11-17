@@ -138,6 +138,8 @@ export const WebsiteFavicon: React.FC<WebsiteFaviconProps> = ({
           src={faviconUrl}
           alt={`${title} icon`}
           referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           onError={() => setImgFailed(true)}
           className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} object-contain transition-all duration-200`}
         />
@@ -213,6 +215,8 @@ export const QuickShortcutIcon: React.FC<QuickShortcutIconProps> = ({
           src={customIcon}
           alt={`${title} icon`}
           referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           onError={() => setCustomImgFailed(true)}
           className={`${innerSizeClass} object-contain`}
         />
@@ -221,6 +225,8 @@ export const QuickShortcutIcon: React.FC<QuickShortcutIconProps> = ({
           src={faviconUrl}
           alt={`${title} icon`}
           referrerPolicy="no-referrer"
+          loading="lazy"
+          decoding="async"
           onError={() => setFaviconFailed(true)}
           className={`${innerSizeClass} object-contain`}
         />

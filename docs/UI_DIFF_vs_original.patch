@@ -1,6 +1,15 @@
 diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
 --- orig/MyFav-main/src/App.tsx	2026-11-16 12:33:49.000000000 +0300
-+++ myfav-cloude/src/App.tsx	2026-11-17 23:24:14.160808539 +0300
++++ myfav-cloude/src/App.tsx	2026-11-17 23:42:36.342115587 +0300
+@@ -3,7 +3,7 @@
+  * SPDX-License-Identifier: Apache-2.0
+  */
+ 
+-import React, { useState, useEffect, useMemo, useRef } from 'react';
++import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
+ import {
+   Search,
+   Plus,
 @@ -39,17 +39,17 @@
    LogIn,
  } from 'lucide-react';
@@ -24,15 +33,77 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  import { apiClient } from './lib/apiClient';
  import {
    BookmarkItem,
-@@ -101,6 +101,7 @@
- import { SharedCollectionView } from './components/SharedCollectionView';
- import { AccountSyncModal } from './components/AccountSyncModal';
- import { AuthPage, AuthPageMode } from './components/AuthPage';
+@@ -87,20 +87,56 @@
+   pickLiveChromeBookmarksFile,
+   readLinkedChromeFile,
+ } from './utils/chromeLiveSync';
+-import { BookmarkModal } from './components/BookmarkModal';
+-import { MoveWebsiteModal } from './components/MoveWebsiteModal';
+-import { BatchEditModal, BatchEditPayload } from './components/BatchEditModal';
+-import { CategoryManagerModal as CategoriesPage } from './components/CategoryManagerModal';
+-import { SettingsModal as SettingsPage } from './components/SettingsModal';
+-import { ChromeSyncPage } from './components/ChromeSyncPage';
+-import { WebsitePreviewModal } from './components/WebsitePreviewModal';
+-import { QuickShortcutModal } from './components/QuickShortcutModal';
+-import { ChromeImportModal } from './components/ChromeImportModal';
++import type { BatchEditPayload } from './components/BatchEditModal';
+ import { MyFavLogo } from './components/MyFavLogo';
+-import { ShareCategoryModal } from './components/ShareCategoryModal';
+-import { SharedCollectionView } from './components/SharedCollectionView';
+-import { AccountSyncModal } from './components/AccountSyncModal';
+-import { AuthPage, AuthPageMode } from './components/AuthPage';
++import type { AuthPageMode } from './components/AuthPage';
++import { Deferred } from './components/Deferred';
++
++// Screens and dialogs that are not needed for the first paint of the Main Page
++// load on demand (and are prefetched in the background once the app is idle).
++const loadBookmarkModal = () => import('./components/BookmarkModal');
++const loadMoveWebsiteModal = () => import('./components/MoveWebsiteModal');
++const loadBatchEditModal = () => import('./components/BatchEditModal');
++const loadCategoriesPage = () => import('./components/CategoryManagerModal');
++const loadSettingsPage = () => import('./components/SettingsModal');
++const loadWebsitePreviewModal = () => import('./components/WebsitePreviewModal');
++const loadQuickShortcutModal = () => import('./components/QuickShortcutModal');
++const loadChromeImportModal = () => import('./components/ChromeImportModal');
++const loadShareCategoryModal = () => import('./components/ShareCategoryModal');
++const loadSharedCollectionView = () => import('./components/SharedCollectionView');
++const loadAccountSyncModal = () => import('./components/AccountSyncModal');
++const loadAuthPage = () => import('./components/AuthPage');
++
++const BookmarkModal = lazy(() => loadBookmarkModal().then((m) => ({ default: m.BookmarkModal })));
++const MoveWebsiteModal = lazy(() => loadMoveWebsiteModal().then((m) => ({ default: m.MoveWebsiteModal })));
++const BatchEditModal = lazy(() => loadBatchEditModal().then((m) => ({ default: m.BatchEditModal })));
++const CategoriesPage = lazy(() => loadCategoriesPage().then((m) => ({ default: m.CategoryManagerModal })));
++const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsModal })));
++const WebsitePreviewModal = lazy(() =>
++  loadWebsitePreviewModal().then((m) => ({ default: m.WebsitePreviewModal }))
++);
++const QuickShortcutModal = lazy(() => loadQuickShortcutModal().then((m) => ({ default: m.QuickShortcutModal })));
++const ChromeImportModal = lazy(() => loadChromeImportModal().then((m) => ({ default: m.ChromeImportModal })));
++const ShareCategoryModal = lazy(() => loadShareCategoryModal().then((m) => ({ default: m.ShareCategoryModal })));
++const SharedCollectionView = lazy(() =>
++  loadSharedCollectionView().then((m) => ({ default: m.SharedCollectionView }))
++);
++const AccountSyncModal = lazy(() => loadAccountSyncModal().then((m) => ({ default: m.AccountSyncModal })));
++const AuthPage = lazy(() => loadAuthPage().then((m) => ({ default: m.AuthPage })));
++
++const PREFETCH_ON_IDLE = [
++  loadAuthPage,
++  loadBookmarkModal,
++  loadWebsitePreviewModal,
++  loadSettingsPage,
++  loadCategoriesPage,
++  loadQuickShortcutModal,
++  loadMoveWebsiteModal,
++  loadBatchEditModal,
++  loadShareCategoryModal,
++  loadChromeImportModal,
++];
 +import { SignInLoadingOverlay, type SignInLoadingStage } from './components/SignInLoadingOverlay';
  
  const STORAGE_KEYS = {
    CATEGORIES: 'aethermark_categories_v1',
-@@ -120,11 +121,69 @@
+@@ -120,11 +156,69 @@
    return `${prefix}_${Date.now()}_${randomPart}`;
  }
  
@@ -102,7 +173,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    const freshSignInTriggeredRef = useRef(false);
    const [syncGateStatus, setSyncGateStatus] = useState<
      'idle' | 'checking' | 'awaiting_choice' | 'ready'
-@@ -142,37 +201,9 @@
+@@ -142,37 +236,9 @@
    const [syncChoiceError, setSyncChoiceError] = useState('');
  
    // Local / Synced Data State — automatically purges all previous demo categories, subcategories, and websites
@@ -142,7 +213,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  
    const [settings, setSettings] = useState<UserSettings>(() => {
      try {
-@@ -193,20 +224,7 @@
+@@ -193,20 +259,7 @@
      };
    });
  
@@ -164,7 +235,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  
    const localCategoriesRef = useRef<CategoryItem[]>(categories);
    const localBookmarksRef = useRef<BookmarkItem[]>(bookmarks);
-@@ -472,6 +490,15 @@
+@@ -472,6 +525,15 @@
  
    const handleSignOut = async () => {
      try {
@@ -180,18 +251,37 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        localStorage.removeItem(STORAGE_KEYS.CLOUD_LINKED_UID);
      } catch {
        // ignore
-@@ -481,7 +508,9 @@
+@@ -481,7 +543,28 @@
      await signOutUser();
    };
  
 -  // Firebase Auth listener with pre-sync decision gate on login
++  // Warm the on-demand screens in the background so their first open is instant.
++  useEffect(() => {
++    const run = () => PREFETCH_ON_IDLE.forEach((load) => void load().catch(() => {}));
++    const w = window as Window & {
++      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
++      cancelIdleCallback?: (id: number) => void;
++    };
++    if (w.requestIdleCallback) {
++      const id = w.requestIdleCallback(run, { timeout: 4000 });
++      return () => w.cancelIdleCallback?.(id);
++    }
++    const t = window.setTimeout(run, 2500);
++    return () => window.clearTimeout(t);
++  }, []);
++
 +  const wasSignedInRef = useRef(false);
++  const prefetchedWorkspaceRef = useRef<{
++    uid: string;
++    data: Awaited<ReturnType<typeof apiClient.getWorkspace>>;
++  } | null>(null);
 +
 +  // Supabase Auth listener (Firebase-compatible facade) with pre-sync decision gate on login
    useEffect(() => {
      let cancelled = false;
      const unsub = onAuthStateChanged(auth, async (currentUser) => {
-@@ -489,6 +518,19 @@
+@@ -489,6 +572,19 @@
  
        if (!currentUser) {
          freshSignInTriggeredRef.current = false;
@@ -211,7 +301,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          setUser(null);
          setAuthReady(true);
          setSyncGateStatus('idle');
-@@ -497,6 +539,7 @@
+@@ -497,6 +593,7 @@
          return;
        }
  
@@ -219,7 +309,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        setUser(currentUser);
        setAuthReady(true);
  
-@@ -507,7 +550,10 @@
+@@ -507,7 +604,10 @@
          // ignore
        }
  
@@ -231,7 +321,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        freshSignInTriggeredRef.current = false;
  
        // Returning session for already-linked account: attach listeners seamlessly
-@@ -517,31 +563,57 @@
+@@ -517,31 +617,60 @@
          return;
        }
  
@@ -255,11 +345,14 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        try {
 -        const cloudData = await apiClient.getWorkspace();
 +        if (hasLocalData) {
-+          await apiClient.syncLocalWorkspace({
++          const synced = await apiClient.syncLocalWorkspace({
 +            categories: localCategories,
 +            bookmarks: localBookmarks,
 +            quickShortcuts: localShortcuts,
 +          });
++          // The sync already returns the full workspace: reuse it instead of
++          // fetching everything a second time.
++          prefetchedWorkspaceRef.current = { uid: currentUser.uid, data: synced };
 +        }
          if (cancelled) return;
 -
@@ -306,7 +399,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        }
      });
  
-@@ -551,7 +623,7 @@
+@@ -551,7 +680,7 @@
      };
    }, []);
  
@@ -315,7 +408,24 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    useEffect(() => {
      if (!authReady || !user || syncGateStatus !== 'ready') {
        if (!user) {
-@@ -2126,7 +2198,7 @@
+@@ -564,8 +693,14 @@
+     let cancelled = false;
+     setCloudLoading(true);
+ 
+-    apiClient
+-      .getWorkspace()
++    const prefetched = prefetchedWorkspaceRef.current;
++    prefetchedWorkspaceRef.current = null;
++    const workspacePromise =
++      prefetched && prefetched.uid === user.uid
++        ? Promise.resolve(prefetched.data)
++        : apiClient.getWorkspace();
++
++    workspacePromise
+       .then((data) => {
+         if (cancelled) return;
+         setCategories(data.categories);
+@@ -2126,7 +2261,7 @@
        );
      }
  
@@ -324,7 +434,49 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
      if (user) {
        let extraIdx = reorderedSiblings.length;
        await apiClient.reorderCategoryTree({
-@@ -2210,6 +2282,19 @@
+@@ -2189,27 +2324,44 @@
+   if (activeShareId) {
+     return (
+       <>
+-        <SharedCollectionView
+-          shareId={activeShareId}
+-          themeMode={settings.themeMode || 'dark'}
+-          onToggleThemeMode={() =>
+-            handleUpdateSettings({
+-              themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
+-            })
+-          }
+-          onExitShareView={handleExitShareView}
+-          onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
+-        />
+-        <WebsitePreviewModal
+-          bookmark={previewingBookmark}
+-          category={null}
+-          subcategory={null}
+-          onClose={() => setPreviewingBookmark(null)}
+-        />
++        <Suspense fallback={null}>
++          <SharedCollectionView
++            shareId={activeShareId}
++            themeMode={settings.themeMode || 'dark'}
++            onToggleThemeMode={() =>
++              handleUpdateSettings({
++                themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
++              })
++            }
++            onExitShareView={handleExitShareView}
++            onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
++          />
++        </Suspense>
++        <Deferred when={previewingBookmark !== null}>
++          <WebsitePreviewModal
++            bookmark={previewingBookmark}
++            category={null}
++            subcategory={null}
++            onClose={() => setPreviewingBookmark(null)}
++          />
++        </Deferred>
+       </>
      );
    }
  
@@ -344,7 +496,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    return (
      <div
        style={{ backgroundColor: isLightMode ? '#F1F5F9' : '#070B14' }}
-@@ -2233,7 +2318,7 @@
+@@ -2233,7 +2385,7 @@
            <MyFavLogo size="md" />
          </a>
  
@@ -353,7 +505,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300 ml-auto">
            {liveSyncToast && (
              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-@@ -2262,7 +2347,7 @@
+@@ -2262,7 +2414,7 @@
                    : 'text-slate-400'
                }`}
              />
@@ -362,7 +514,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
            </button>
  
            <button
-@@ -2355,7 +2440,7 @@
+@@ -2355,7 +2507,7 @@
  
                  {/* Scrollable Category & Subcategory Tree */}
                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-2.5">
@@ -371,7 +523,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <button
                      type="button"
                      onClick={() => {
-@@ -2379,7 +2464,7 @@
+@@ -2379,7 +2531,7 @@
                        >
                          <Bookmark className="w-4 h-4" strokeWidth={2.1} />
                        </span>
@@ -380,7 +532,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                      </div>
                      <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[10px] font-mono-tabular text-slate-400">
                        {bookmarks.length}
-@@ -2883,7 +2968,7 @@
+@@ -2883,7 +3035,7 @@
  
                  {/* Vertical Enhanced Category Icons List */}
                  <div className="flex-1 overflow-y-auto space-y-2.5 py-3 w-full flex flex-col items-center no-scrollbar">
@@ -389,7 +541,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <div className="relative flex flex-col items-center w-full">
                      {activeView === 'all' && selectedCategoryId === 'all' && (
                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full accent-bg shadow-[0_0_10px_var(--accent-primary)]" />
-@@ -2895,8 +2980,8 @@
+@@ -2895,8 +3047,8 @@
                          setSelectedCategoryId('all');
                          setSelectedSubcategoryId('all');
                        }}
@@ -400,7 +552,111 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                        className={`group/icon relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                          activeView === 'all' && selectedCategoryId === 'all'
                            ? 'accent-bg text-white shadow-[0_6px_16px_rgba(var(--accent-rgb),0.35)] scale-105'
-@@ -3210,7 +3295,7 @@
+@@ -3149,51 +3301,59 @@
+         {/* Main Viewport */}
+         <main className="flex-1 min-w-0 space-y-5">
+           {activeView === 'categories' ? (
+-            <CategoriesPage
+-              onBackToDirectory={() => setActiveView('all')}
+-              onSelectCategoryInDirectory={(catId, subId) => {
+-                setSelectedCategoryId(catId);
+-                setSelectedSubcategoryId(subId || 'all');
+-                setActiveView('all');
+-                window.scrollTo({ top: 0, behavior: 'smooth' });
+-              }}
+-              categories={categories}
+-              bookmarks={bookmarks}
+-              sharedByCategoryId={sharedByCategoryId}
+-              onOpenShareModal={(cat) => setSharingCategory(cat)}
+-              onCreateCategory={async (name, icon, parentId) => {
+-                await handleCreateCategory(name, icon, parentId);
+-              }}
+-              onUpdateCategory={handleUpdateCategory}
+-              onDeleteCategory={handleDeleteCategory}
+-              onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
+-            />
++            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
++                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
++              </div>}>
++              <CategoriesPage
++                onBackToDirectory={() => setActiveView('all')}
++                onSelectCategoryInDirectory={(catId, subId) => {
++                  setSelectedCategoryId(catId);
++                  setSelectedSubcategoryId(subId || 'all');
++                  setActiveView('all');
++                  window.scrollTo({ top: 0, behavior: 'smooth' });
++                }}
++                categories={categories}
++                bookmarks={bookmarks}
++                sharedByCategoryId={sharedByCategoryId}
++                onOpenShareModal={(cat) => setSharingCategory(cat)}
++                onCreateCategory={async (name, icon, parentId) => {
++                  await handleCreateCategory(name, icon, parentId);
++                }}
++                onUpdateCategory={handleUpdateCategory}
++                onDeleteCategory={handleDeleteCategory}
++                onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
++              />
++            </Suspense>
+           ) : activeView === 'settings' || activeView === 'chrome-sync' ? (
+-            <SettingsPage
+-              onBackToDirectory={() => setActiveView('all')}
+-              settings={settings}
+-              onUpdateSettings={handleUpdateSettings}
+-              user={user}
+-              onSignIn={async () => openAuthPage('login')}
+-              onSignOut={handleSignOut}
+-              onResetDefaults={handleClearEntireWorkspace}
+-              existingCategoryCount={categories.length}
+-              existingBookmarkCount={bookmarks.length}
+-              categories={categories}
+-              bookmarks={bookmarks}
+-              quickShortcuts={quickShortcuts}
+-              onImportExactPlan={handleImportExactChromePlan}
+-              onClearEntireWorkspace={handleClearEntireWorkspace}
+-              defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
+-              linkedChromeFileName={linkedChromeFileName}
+-              lastChromeSyncTime={lastChromeSyncTime}
+-              autoWatchChromeFile={autoWatchChromeFile}
+-              onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
+-              onLinkLiveChromeFile={handleLinkLiveChromeFile}
+-              onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+-              onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
+-              onOpenImportModal={() => setIsChromeImportModalOpen(true)}
+-            />
++            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
++                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
++              </div>}>
++              <SettingsPage
++                onBackToDirectory={() => setActiveView('all')}
++                settings={settings}
++                onUpdateSettings={handleUpdateSettings}
++                user={user}
++                onSignIn={async () => openAuthPage('login')}
++                onSignOut={handleSignOut}
++                onResetDefaults={handleClearEntireWorkspace}
++                existingCategoryCount={categories.length}
++                existingBookmarkCount={bookmarks.length}
++                categories={categories}
++                bookmarks={bookmarks}
++                quickShortcuts={quickShortcuts}
++                onImportExactPlan={handleImportExactChromePlan}
++                onClearEntireWorkspace={handleClearEntireWorkspace}
++                defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
++                linkedChromeFileName={linkedChromeFileName}
++                lastChromeSyncTime={lastChromeSyncTime}
++                autoWatchChromeFile={autoWatchChromeFile}
++                onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
++                onLinkLiveChromeFile={handleLinkLiveChromeFile}
++                onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
++                onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
++                onOpenImportModal={() => setIsChromeImportModalOpen(true)}
++              />
++            </Suspense>
+           ) : (
+             <>
+               {/* Unified Top Header (matching Settings & Categories page header style) */}
+@@ -3210,7 +3370,7 @@
                        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-1.5"
                      >
                        <ArrowLeft className="w-3.5 h-3.5" />
@@ -409,15 +665,298 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                      </button>
                    ) : (
                      <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
-@@ -4213,6 +4298,8 @@
+@@ -4126,76 +4286,89 @@
+       </nav>
+ 
+       {/* Modals for Saving/Editing or Moving a Website */}
+-      <BookmarkModal
+-        isOpen={isBookmarkModalOpen}
+-        onClose={() => {
+-          setIsBookmarkModalOpen(false);
+-          setEditingBookmark(null);
+-        }}
+-        onSave={handleSaveBookmark}
+-        onQuickCreateCategory={(name, parentId) =>
+-          handleCreateCategory(name, '', parentId)
+-        }
+-        categories={categories}
+-        initialBookmark={editingBookmark}
+-        defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
+-        defaultSubcategoryId={
+-          selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
+-        }
+-      />
++      <Deferred when={isBookmarkModalOpen}>
++        <BookmarkModal
++          isOpen={isBookmarkModalOpen}
++          onClose={() => {
++            setIsBookmarkModalOpen(false);
++            setEditingBookmark(null);
++          }}
++          onSave={handleSaveBookmark}
++          onQuickCreateCategory={(name, parentId) =>
++            handleCreateCategory(name, '', parentId)
++          }
++          categories={categories}
++          initialBookmark={editingBookmark}
++          defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
++          defaultSubcategoryId={
++            selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
++          }
++        />
++      </Deferred>
+ 
+-      <MoveWebsiteModal
+-        isOpen={bookmarksToMove.length > 0}
+-        onClose={() => setBookmarksToMove([])}
+-        bookmarksToMove={bookmarksToMove}
+-        categories={categories}
+-        onConfirmMove={handleMoveWebsites}
+-      />
+-
+-      <BatchEditModal
+-        isOpen={bookmarksToBatchEdit.length > 0}
+-        onClose={() => setBookmarksToBatchEdit([])}
+-        bookmarksToEdit={bookmarksToBatchEdit}
+-        categories={categories}
+-        onConfirmBatchEdit={handleBatchEditWebsites}
+-      />
+-
+-      <WebsitePreviewModal
+-        bookmark={previewingBookmark}
+-        category={
+-          previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
+-        }
+-        subcategory={
+-          previewingBookmark?.subcategoryId
+-            ? categoryMap[previewingBookmark.subcategoryId] || null
+-            : null
+-        }
+-        onClose={() => setPreviewingBookmark(null)}
+-      />
++      <Deferred when={bookmarksToMove.length > 0}>
++        <MoveWebsiteModal
++          isOpen={bookmarksToMove.length > 0}
++          onClose={() => setBookmarksToMove([])}
++          bookmarksToMove={bookmarksToMove}
++          categories={categories}
++          onConfirmMove={handleMoveWebsites}
++        />
++      </Deferred>
++
++      <Deferred when={bookmarksToBatchEdit.length > 0}>
++        <BatchEditModal
++          isOpen={bookmarksToBatchEdit.length > 0}
++          onClose={() => setBookmarksToBatchEdit([])}
++          bookmarksToEdit={bookmarksToBatchEdit}
++          categories={categories}
++          onConfirmBatchEdit={handleBatchEditWebsites}
++        />
++      </Deferred>
++
++      <Deferred when={previewingBookmark !== null}>
++        <WebsitePreviewModal
++          bookmark={previewingBookmark}
++          category={
++            previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
++          }
++          subcategory={
++            previewingBookmark?.subcategoryId
++              ? categoryMap[previewingBookmark.subcategoryId] || null
++              : null
++          }
++          onClose={() => setPreviewingBookmark(null)}
++        />
++      </Deferred>
++
++      <Deferred when={isShortcutModalOpen}>
++        <QuickShortcutModal
++          isOpen={isShortcutModalOpen}
++          onClose={() => {
++            setIsShortcutModalOpen(false);
++            setEditingShortcut(null);
++          }}
++          onSave={handleSaveQuickShortcut}
++          onDelete={handleDeleteQuickShortcut}
++          bookmarks={bookmarks}
++          initialShortcut={editingShortcut}
++        />
++      </Deferred>
+ 
+-      <QuickShortcutModal
+-        isOpen={isShortcutModalOpen}
+-        onClose={() => {
+-          setIsShortcutModalOpen(false);
+-          setEditingShortcut(null);
+-        }}
+-        onSave={handleSaveQuickShortcut}
+-        onDelete={handleDeleteQuickShortcut}
+-        bookmarks={bookmarks}
+-        initialShortcut={editingShortcut}
+-      />
+-
+-      <ChromeImportModal
+-        isOpen={isChromeImportModalOpen}
+-        onClose={() => setIsChromeImportModalOpen(false)}
+-        onImportExactPlan={handleImportExactChromePlan}
+-        linkedChromeFileName={linkedChromeFileName}
+-        lastChromeSyncTime={lastChromeSyncTime}
+-        onLinkLiveChromeFile={handleLinkLiveChromeFile}
+-        onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+-      />
++      <Deferred when={isChromeImportModalOpen}>
++        <ChromeImportModal
++          isOpen={isChromeImportModalOpen}
++          onClose={() => setIsChromeImportModalOpen(false)}
++          onImportExactPlan={handleImportExactChromePlan}
++          linkedChromeFileName={linkedChromeFileName}
++          lastChromeSyncTime={lastChromeSyncTime}
++          onLinkLiveChromeFile={handleLinkLiveChromeFile}
++          onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
++        />
++      </Deferred>
+ 
+       {sharingCategory && (
++        <Suspense fallback={null}>
+         <ShareCategoryModal
+           category={sharingCategory}
+           subcategories={subcategoriesByParent[sharingCategory.id] || []}
+@@ -4211,52 +4384,59 @@
+           onPreviewSharedPage={handleOpenSharePreview}
+           onClose={() => setSharingCategory(null)}
          />
++        </Suspense>
        )}
  
+-      <AccountSyncModal
+-        isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
+-        userEmail={pendingSyncChoice?.targetUser.email || ''}
+-        userName={pendingSyncChoice?.targetUser.displayName}
+-        hasLocalData={Boolean(
+-          pendingSyncChoice &&
+-            (pendingSyncChoice.localCategories.length > 0 ||
+-              pendingSyncChoice.localBookmarks.length > 0 ||
+-              pendingSyncChoice.localShortcuts.length > 0)
+-        )}
+-        hasCloudData={Boolean(
+-          pendingSyncChoice &&
+-            (pendingSyncChoice.cloudCategories.length > 0 ||
+-              pendingSyncChoice.cloudBookmarks.length > 0 ||
+-              pendingSyncChoice.cloudShortcuts.length > 0)
+-        )}
+-        localCounts={{
+-          categories: pendingSyncChoice?.localCategories.length || 0,
+-          bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
+-          shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
+-        }}
+-        cloudCounts={{
+-          categories: pendingSyncChoice?.cloudCategories.length || 0,
+-          bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
+-          shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
+-        }}
+-        isProcessing={isSyncChoiceProcessing}
+-        error={syncChoiceError}
+-        onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
+-        onKeepLocalOnly={handleChoiceKeepLocalOnly}
+-        onGetCloudAndSync={handleChoiceGetCloudAndSync}
+-        onStartFresh={handleChoiceStartFresh}
+-      />
+-
+-      <AuthPage
+-        isOpen={Boolean(authPageMode && !user)}
+-        mode={authPageMode || 'login'}
+-        onModeChange={(nextMode) => setAuthPageMode(nextMode)}
+-        onClose={closeAuthPage}
+-        onGoogleLogin={handleGoogleLogin}
+-        onEmailLogin={handleEmailLogin}
+-        onEmailRegister={handleEmailRegister}
+-        onPasswordReset={handlePasswordReset}
+-      />
 +      <SignInLoadingOverlay stage={signInLoadingStage} />
 +
-       <AccountSyncModal
-         isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
-         userEmail={pendingSyncChoice?.targetUser.email || ''}
++      <Deferred when={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}>
++        <AccountSyncModal
++          isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
++          userEmail={pendingSyncChoice?.targetUser.email || ''}
++          userName={pendingSyncChoice?.targetUser.displayName}
++          hasLocalData={Boolean(
++            pendingSyncChoice &&
++              (pendingSyncChoice.localCategories.length > 0 ||
++                pendingSyncChoice.localBookmarks.length > 0 ||
++                pendingSyncChoice.localShortcuts.length > 0)
++          )}
++          hasCloudData={Boolean(
++            pendingSyncChoice &&
++              (pendingSyncChoice.cloudCategories.length > 0 ||
++                pendingSyncChoice.cloudBookmarks.length > 0 ||
++                pendingSyncChoice.cloudShortcuts.length > 0)
++          )}
++          localCounts={{
++            categories: pendingSyncChoice?.localCategories.length || 0,
++            bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
++            shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
++          }}
++          cloudCounts={{
++            categories: pendingSyncChoice?.cloudCategories.length || 0,
++            bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
++            shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
++          }}
++          isProcessing={isSyncChoiceProcessing}
++          error={syncChoiceError}
++          onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
++          onKeepLocalOnly={handleChoiceKeepLocalOnly}
++          onGetCloudAndSync={handleChoiceGetCloudAndSync}
++          onStartFresh={handleChoiceStartFresh}
++        />
++      </Deferred>
++
++      <Deferred when={Boolean(authPageMode && !user)}>
++        <AuthPage
++          isOpen={Boolean(authPageMode && !user)}
++          mode={authPageMode || 'login'}
++          onModeChange={(nextMode) => setAuthPageMode(nextMode)}
++          onClose={closeAuthPage}
++          onGoogleLogin={handleGoogleLogin}
++          onEmailLogin={handleEmailLogin}
++          onEmailRegister={handleEmailRegister}
++          onPasswordReset={handlePasswordReset}
++        />
++      </Deferred>
+     </div>
+   );
+ }
+Only in myfav-cloude/src/assets/images: myfav_app_logo_160.webp
+Only in orig/MyFav-main/src/assets/images: myfav_app_logo_1794774931445.jpg
+diff -ru -x '*.test.*' orig/MyFav-main/src/components/CategoryIcon.tsx myfav-cloude/src/components/CategoryIcon.tsx
+--- orig/MyFav-main/src/components/CategoryIcon.tsx	2026-11-16 12:33:49.000000000 +0300
++++ myfav-cloude/src/components/CategoryIcon.tsx	2026-11-17 23:40:54.054049500 +0300
+@@ -138,6 +138,8 @@
+           src={faviconUrl}
+           alt={`${title} icon`}
+           referrerPolicy="no-referrer"
++          loading="lazy"
++          decoding="async"
+           onError={() => setImgFailed(true)}
+           className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} object-contain transition-all duration-200`}
+         />
+@@ -213,6 +215,8 @@
+           src={customIcon}
+           alt={`${title} icon`}
+           referrerPolicy="no-referrer"
++          loading="lazy"
++          decoding="async"
+           onError={() => setCustomImgFailed(true)}
+           className={`${innerSizeClass} object-contain`}
+         />
+@@ -221,6 +225,8 @@
+           src={faviconUrl}
+           alt={`${title} icon`}
+           referrerPolicy="no-referrer"
++          loading="lazy"
++          decoding="async"
+           onError={() => setFaviconFailed(true)}
+           className={`${innerSizeClass} object-contain`}
+         />
 diff -ru -x '*.test.*' orig/MyFav-main/src/components/ChromeSyncPage.tsx myfav-cloude/src/components/ChromeSyncPage.tsx
 --- orig/MyFav-main/src/components/ChromeSyncPage.tsx	2026-11-16 12:33:49.000000000 +0300
 +++ myfav-cloude/src/components/ChromeSyncPage.tsx	2026-11-17 15:10:29.487693262 +0300
@@ -430,7 +969,28 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/components/ChromeSyncPage.tsx myfav-c
  import {
    ChromeImportPlan,
    parseChromeBookmarksExactArrangement,
+Only in myfav-cloude/src/components: Deferred.tsx
 Only in myfav-cloude/src/components: EmailVerificationModal.tsx
+diff -ru -x '*.test.*' orig/MyFav-main/src/components/MyFavLogo.tsx myfav-cloude/src/components/MyFavLogo.tsx
+--- orig/MyFav-main/src/components/MyFavLogo.tsx	2026-11-16 12:33:49.000000000 +0300
++++ myfav-cloude/src/components/MyFavLogo.tsx	2026-11-17 23:40:48.974738264 +0300
+@@ -1,5 +1,5 @@
+ import React, { useState } from 'react';
+-import myFavLogoImg from '../assets/images/myfav_app_logo_1794774931445.jpg';
++import myFavLogoImg from '../assets/images/myfav_app_logo_160.webp';
+ 
+ interface MyFavLogoProps {
+   size?: 'sm' | 'md' | 'lg';
+@@ -36,6 +36,9 @@
+           <img
+             src={myFavLogoImg}
+             alt="MyFav Logo"
++            width={160}
++            height={160}
++            decoding="async"
+             onError={() => setImgError(true)}
+             className="w-full h-full object-cover scale-125"
+           />
 Only in myfav-cloude/src/components: PasswordRecoveryModal.tsx
 diff -ru -x '*.test.*' orig/MyFav-main/src/components/SettingsModal.tsx myfav-cloude/src/components/SettingsModal.tsx
 --- orig/MyFav-main/src/components/SettingsModal.tsx	2026-11-16 12:33:49.000000000 +0300
