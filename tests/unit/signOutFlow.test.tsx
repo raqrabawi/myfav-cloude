@@ -18,6 +18,7 @@ const signedInUser = { uid: 'u1', email: 'u1@x.dev', displayName: 'U One', email
 vi.mock('../../src/lib/auth', () => ({
   auth: { currentUser: null },
   consumeOAuthFreshSignInFlag: () => false,
+  OAUTH_FRESH_SIGNIN_KEY: 'myfav.v2.oauthFreshSignIn',
   onAuthStateChanged: (_a: unknown, cb: Cb) => {
     authState.cb = cb;
     return () => {};
@@ -42,12 +43,10 @@ const cloudWorkspace = {
   settings: null,
 };
 const api = vi.hoisted(() => ({
-  getWorkspace: undefined as unknown as ReturnType<typeof import('vitest').vi.fn>,
-  syncLocalWorkspace: undefined as unknown as ReturnType<typeof import('vitest').vi.fn>,
+  getWorkspace: vi.fn(),
+  syncLocalWorkspace: vi.fn(),
 }));
 vi.mock('../../src/lib/apiClient', () => {
-  api.getWorkspace = vi.fn(async () => cloudWorkspace);
-  api.syncLocalWorkspace = vi.fn(async () => cloudWorkspace);
   return {
     apiClient: new Proxy(api as Record<string, unknown>, {
       get: (t, k) => (k in t ? t[k as string] : vi.fn(async () => undefined)),
@@ -73,8 +72,8 @@ let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
-  api.getWorkspace?.mockClear();
-  api.syncLocalWorkspace?.mockClear();
+  api.getWorkspace.mockReset().mockImplementation(async () => cloudWorkspace);
+  api.syncLocalWorkspace.mockReset().mockImplementation(async () => cloudWorkspace);
   localStorage.clear();
   sessionStorage.clear();
   authState.cb = null;
@@ -184,5 +183,50 @@ describe('sign-in with existing data: automatic sync, no prompt', () => {
     expect(localStorage.getItem(KEYS.LINKED)).toBeNull();
     expect(guestBookmarks().map((b: { id: string }) => b.id)).toEqual(['g1']);
     expect(host.textContent).toContain("Couldn't sync this device's websites yet");
+  });
+});
+
+const wait = async (ms: number) => {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, ms));
+  });
+};
+
+describe('loading animation after sign-in', () => {
+  const overlay = () => document.querySelector('[data-testid="signin-loading-overlay"]');
+
+  it('shows "Syncing your websites" while the merge runs, then disappears when the Main Page is ready', async () => {
+    localStorage.setItem(KEYS.BOOKMARKS, JSON.stringify([{ ...cloudWorkspace.bookmarks[0], id: 'g1', ownerId: 'local', title: 'Guest Only Site', url: 'https://guest.example', categoryId: '' }]));
+    let release!: () => void;
+    api.syncLocalWorkspace.mockImplementationOnce(() => new Promise((r) => (release = () => r(cloudWorkspace))));
+
+    const { default: App } = await import('../../src/App');
+    root = createRoot(host);
+    await act(async () => root.render(React.createElement(App)));
+    await act(async () => {
+      void authState.cb?.(signedInUser); // don't await: the sync is held open on purpose
+    });
+    await wait(300); // > 180 ms show delay
+
+    expect(overlay()).toBeTruthy();
+    expect(overlay()!.getAttribute('aria-label')).toMatch(/Syncing your websites/);
+
+    await act(async () => release());
+    await wait(800); // exit animation
+
+    expect(overlay()).toBeNull();
+    expect(host.textContent).toContain('Cloud Secret Site');
+  });
+
+  it('shows "Signing you in" when the page opens on the way back from Google', async () => {
+    sessionStorage.setItem('myfav.v2.oauthFreshSignIn', '1');
+    const { default: App } = await import('../../src/App');
+    root = createRoot(host);
+    await act(async () => root.render(React.createElement(App)));
+    await wait(300);
+    expect(overlay()?.getAttribute('aria-label')).toMatch(/Signing you in/);
+    await act(async () => authState.cb?.(signedInUser));
+    await wait(800);
+    expect(overlay()).toBeNull();
   });
 });

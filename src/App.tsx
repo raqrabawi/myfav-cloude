@@ -41,6 +41,7 @@ import {
 import {
   auth,
   consumeOAuthFreshSignInFlag,
+  OAUTH_FRESH_SIGNIN_KEY,
   onAuthStateChanged,
   registerWithEmail,
   sendPasswordReset,
@@ -100,6 +101,7 @@ import { ShareCategoryModal } from './components/ShareCategoryModal';
 import { SharedCollectionView } from './components/SharedCollectionView';
 import { AccountSyncModal } from './components/AccountSyncModal';
 import { AuthPage, AuthPageMode } from './components/AuthPage';
+import { SignInLoadingOverlay, type SignInLoadingStage } from './components/SignInLoadingOverlay';
 
 const STORAGE_KEYS = {
   CATEGORIES: 'aethermark_categories_v1',
@@ -174,6 +176,14 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [cloudLoading, setCloudLoading] = useState(false);
+  // Page opened by returning from Google sign-in: show the loader until auth resolves.
+  const [returningFromSignIn] = useState(() => {
+    try {
+      return sessionStorage.getItem(OAUTH_FRESH_SIGNIN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const freshSignInTriggeredRef = useRef(false);
   const [syncGateStatus, setSyncGateStatus] = useState<
     'idle' | 'checking' | 'awaiting_choice' | 'ready'
@@ -2272,6 +2282,19 @@ export default function App() {
     );
   }
 
+  const signInLoadingStage: SignInLoadingStage | null =
+    !authReady && returningFromSignIn
+      ? 'signing-in'
+      : user && syncGateStatus === 'checking'
+      ? localBookmarksRef.current.length > 0 ||
+        localCategoriesRef.current.length > 0 ||
+        localQuickShortcutsRef.current.length > 0
+        ? 'syncing'
+        : 'loading'
+      : user && cloudLoading
+      ? 'loading'
+      : null;
+
   return (
     <div
       style={{ backgroundColor: isLightMode ? '#F1F5F9' : '#070B14' }}
@@ -4274,6 +4297,8 @@ export default function App() {
           onClose={() => setSharingCategory(null)}
         />
       )}
+
+      <SignInLoadingOverlay stage={signInLoadingStage} />
 
       <AccountSyncModal
         isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
