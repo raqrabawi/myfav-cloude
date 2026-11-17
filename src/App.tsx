@@ -553,31 +553,57 @@ export default function App() {
         return;
       }
 
-      // Fresh Google login or unlinked account: inspect local vs cloud data and prompt user
+      // Fresh login or unlinked account: no prompt. Merge this browser's guest
+      // workspace into the account (server de-duplicates websites by URL and
+      // categories by name), link the browser, then open the Main Page with the
+      // combined cloud workspace.
       setSyncGateStatus('checking');
       setCloudLoading(true);
       setSyncChoiceError('');
+      setPendingSyncChoice(null);
 
+      const localCategories = localCategoriesRef.current;
+      const localBookmarks = localBookmarksRef.current;
+      const localShortcuts = localQuickShortcutsRef.current;
+      const hasLocalData =
+        localCategories.length > 0 || localBookmarks.length > 0 || localShortcuts.length > 0;
+
+      let syncFailed = false;
       try {
-        const cloudData = await apiClient.getWorkspace();
+        if (hasLocalData) {
+          await apiClient.syncLocalWorkspace({
+            categories: localCategories,
+            bookmarks: localBookmarks,
+            quickShortcuts: localShortcuts,
+          });
+        }
         if (cancelled) return;
-
-        setPendingSyncChoice({
-          targetUser: currentUser,
-          localCategories: localCategoriesRef.current,
-          localBookmarks: localBookmarksRef.current,
-          localShortcuts: localQuickShortcutsRef.current,
-          cloudCategories: cloudData.categories,
-          cloudBookmarks: cloudData.bookmarks,
-          cloudShortcuts: cloudData.quickShortcuts,
-        });
-        setSyncGateStatus('awaiting_choice');
-        setCloudLoading(false);
+        try {
+          localStorage.setItem(STORAGE_KEYS.CLOUD_LINKED_UID, currentUser.uid);
+          localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+          localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify([]));
+          localStorage.setItem(STORAGE_KEYS.QUICK_SHORTCUTS, JSON.stringify([]));
+        } catch {
+          // ignore
+        }
       } catch (error) {
         if (cancelled) return;
-        setCloudLoading(false);
-        setSyncGateStatus('ready');
-        console.error('Could not check existing cloud data:', error);
+        // Not linked: the guest copy stays in this browser and the merge is
+        // retried on the next sign-in. Nothing is lost.
+        syncFailed = true;
+        console.error('Automatic sync of local data failed:', error);
+      }
+
+      setActiveView('all');
+      setSelectedCategoryId('all');
+      setSelectedSubcategoryId('all');
+      setSyncGateStatus('ready');
+      if (syncFailed) {
+        setLiveSyncToast("Couldn't sync this device's websites yet. They're kept here and will sync next time you log in.");
+        setTimeout(() => setLiveSyncToast(null), 5000);
+      } else if (hasLocalData) {
+        setLiveSyncToast('Synced your websites to your account');
+        setTimeout(() => setLiveSyncToast(null), 3500);
       }
     });
 
