@@ -1,5 +1,7 @@
 # MyFav V2
 
+**Live:** https://myfav.figma.site (main) · https://raqrabawi.github.io/myfav-cloude/ (auto-deployed from `main`)
+
 A rebuild of **MyFav — Personal Web Curator** on **Neon**. The user interface is the original MyFav UI, unchanged (verified pixel-identical; see `VISUAL_PARITY.md`). Underneath, Firebase Auth, the Express API, Drizzle and the self-managed PostgreSQL server are replaced by **Neon Managed Better Auth + Neon Data API + Postgres Row Level Security + transactional RPCs**.
 
 > The original MyFav repository, Firebase project and database are **not touched** by this project.
@@ -66,7 +68,7 @@ Host `dist/` on any static host (Vercel, Netlify, Cloudflare Pages…):
 - add the deployed origin to Neon Auth trusted domains (and the Data API CORS origins if you restrict them)
 - recommended CSP `connect-src`: `https://*.neonauth.<region>.aws.neon.tech https://*.apirest.<region>.aws.neon.tech https://www.google-analytics.com`
 
-**Figma Sites / Figma Make (live: https://myfavlinks.figma.site):** these hosts don't inject build-time env vars, so the app falls back to the built-in production URL (`DEFAULT_NEON_URL` in `src/lib/neonClient.ts`). `https://myfavlinks.figma.site` is on `production`'s Neon Auth trusted domains. After changing code, re-sync it to Figma and republish.
+**Figma Sites / Figma Make (main site: https://myfav.figma.site):** these hosts don't inject build-time env vars, so the app falls back to the built-in production URL (`DEFAULT_NEON_URL` in `src/lib/neonClient.ts`). `https://myfav.figma.site` is on `production`'s Neon Auth trusted domains (with `https://raqrabawi.github.io` for the GitHub Pages copy). After changing code, re-sync it to Figma and republish.
 
 ## 4. Tests
 | Command | What |
