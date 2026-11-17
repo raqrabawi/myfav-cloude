@@ -2235,7 +2235,7 @@ export default function App() {
           <MyFavLogo size="md" />
         </a>
 
-        {/* Right-Aligned Top Navigation Menu (All Websites, Categories, Settings) */}
+        {/* Right-Aligned Top Navigation Menu (Main Page, Categories, Settings) */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300 ml-auto">
           {liveSyncToast && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
@@ -2264,7 +2264,7 @@ export default function App() {
                   : 'text-slate-400'
               }`}
             />
-            <span>All Websites</span>
+            <span>Main Page</span>
           </button>
 
           <button
@@ -2357,7 +2357,7 @@ export default function App() {
 
                 {/* Scrollable Category & Subcategory Tree */}
                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-2.5">
-                  {/* All Websites Navigation Button */}
+                  {/* Main Page Navigation Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2381,7 +2381,7 @@ export default function App() {
                       >
                         <Bookmark className="w-4 h-4" strokeWidth={2.1} />
                       </span>
-                      <span className="text-xs font-semibold truncate">All Websites</span>
+                      <span className="text-xs font-semibold truncate">Main Page</span>
                     </div>
                     <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[10px] font-mono-tabular text-slate-400">
                       {bookmarks.length}
@@ -2885,7 +2885,7 @@ export default function App() {
 
                 {/* Vertical Enhanced Category Icons List */}
                 <div className="flex-1 overflow-y-auto space-y-2.5 py-3 w-full flex flex-col items-center no-scrollbar">
-                  {/* All Websites Icon */}
+                  {/* Main Page Icon */}
                   <div className="relative flex flex-col items-center w-full">
                     {activeView === 'all' && selectedCategoryId === 'all' && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full accent-bg shadow-[0_0_10px_var(--accent-primary)]" />
@@ -2897,8 +2897,8 @@ export default function App() {
                         setSelectedCategoryId('all');
                         setSelectedSubcategoryId('all');
                       }}
-                      title={`All Websites (${bookmarks.length})`}
-                      aria-label="All Websites"
+                      title={`Main Page (${bookmarks.length})`}
+                      aria-label="Main Page"
                       className={`group/icon relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                         activeView === 'all' && selectedCategoryId === 'all'
                           ? 'accent-bg text-white shadow-[0_6px_16px_rgba(var(--accent-rgb),0.35)] scale-105'
@@ -3212,7 +3212,7 @@ export default function App() {
                       className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-1.5"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to All Websites</span>
+                      <span>Back to Main Page</span>
                     </button>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
