@@ -1,0 +1,50 @@
+PASS  import MERGE basic into empty workspace: summary counters {"addedCategories":6,"addedBookmarks":10,"skippedDuplicates":2,"expanded":4}
+PASS  import MERGE basic into empty workspace: root categories [4 rows]
+PASS  import MERGE basic into empty workspace: subcategories [2 rows]
+PASS  import MERGE basic into empty workspace: bookmarks (order + placement) [10 rows]
+PASS  import MERGE basic into empty workspace: quick shortcuts [0 rows]
+PASS  import MERGE basic into seeded workspace: summary counters {"addedCategories":4,"addedBookmarks":8,"skippedDuplicates":4,"expanded":4}
+PASS  import MERGE basic into seeded workspace: root categories [5 rows]
+PASS  import MERGE basic into seeded workspace: subcategories [2 rows]
+PASS  import MERGE basic into seeded workspace: bookmarks (order + placement) [10 rows]
+PASS  import MERGE basic into seeded workspace: quick shortcuts [1 rows]
+PASS  import MERGE basic twice (all duplicates second time): summary counters {"addedCategories":0,"addedBookmarks":0,"skippedDuplicates":12,"expanded":4}
+PASS  import MERGE basic twice (all duplicates second time): root categories [5 rows]
+PASS  import MERGE basic twice (all duplicates second time): subcategories [2 rows]
+PASS  import MERGE basic twice (all duplicates second time): bookmarks (order + placement) [10 rows]
+PASS  import MERGE basic twice (all duplicates second time): quick shortcuts [1 rows]
+PASS  import REPLACE basic over seeded workspace: summary counters {"addedCategories":6,"addedBookmarks":12,"skippedDuplicates":0,"expanded":4}
+PASS  import REPLACE basic over seeded workspace: root categories [4 rows]
+PASS  import REPLACE basic over seeded workspace: subcategories [2 rows]
+PASS  import REPLACE basic over seeded workspace: bookmarks (order + placement) [12 rows]
+PASS  import REPLACE basic over seeded workspace: quick shortcuts [0 rows]
+PASS  import MERGE malformed file: summary counters {"addedCategories":2,"addedBookmarks":2,"skippedDuplicates":0,"expanded":2}
+PASS  import MERGE malformed file: root categories [4 rows]
+PASS  import MERGE malformed file: subcategories [1 rows]
+PASS  import MERGE malformed file: bookmarks (order + placement) [4 rows]
+PASS  import MERGE malformed file: quick shortcuts [1 rows]
+PASS  import MERGE empty file: summary counters {"addedCategories":0,"addedBookmarks":0,"skippedDuplicates":0,"expanded":0}
+PASS  import MERGE empty file: root categories [2 rows]
+PASS  import MERGE empty file: subcategories [1 rows]
+PASS  import MERGE empty file: bookmarks (order + placement) [2 rows]
+PASS  import MERGE empty file: quick shortcuts [1 rows]
+PASS  import MERGE large 5000 into seeded workspace: summary counters {"addedCategories":250,"addedBookmarks":1225,"skippedDuplicates":3775,"expanded":50}
+PASS  import MERGE large 5000 into seeded workspace: root categories [52 rows]
+PASS  import MERGE large 5000 into seeded workspace: subcategories [201 rows]
+PASS  import MERGE large 5000 into seeded workspace: bookmarks (order + placement) [1227 rows]
+PASS  import MERGE large 5000 into seeded workspace: quick shortcuts [1 rows]
+PASS  import REPLACE large 5000: summary counters {"addedCategories":250,"addedBookmarks":5000,"skippedDuplicates":0,"expanded":50}
+PASS  import REPLACE large 5000: root categories [50 rows]
+PASS  import REPLACE large 5000: subcategories [200 rows]
+PASS  import REPLACE large 5000: bookmarks (order + placement) [5000 rows]
+PASS  import REPLACE large 5000: quick shortcuts [0 rows]
+PASS  sync-local guest data into empty cloud: root categories [4 rows]
+PASS  sync-local guest data into empty cloud: subcategories [2 rows]
+PASS  sync-local guest data into empty cloud: bookmarks (order + placement) [5 rows]
+PASS  sync-local guest data into empty cloud: quick shortcuts [3 rows]
+PASS  sync-local guest data into seeded cloud: root categories [5 rows]
+PASS  sync-local guest data into seeded cloud: subcategories [2 rows]
+PASS  sync-local guest data into seeded cloud: bookmarks (order + placement) [6 rows]
+PASS  sync-local guest data into seeded cloud: quick shortcuts [3 rows]
+
+ALL PARITY CHECKS PASSED

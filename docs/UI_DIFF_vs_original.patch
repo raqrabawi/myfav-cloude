@@ -1,0 +1,863 @@
+diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx MyFav-V2/src/App.tsx
+--- orig/MyFav-main/src/App.tsx	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/App.tsx	2026-11-17 11:19:05.074823501 +0300
+@@ -39,17 +39,16 @@
+   LogIn,
+ } from 'lucide-react';
+ import {
+-  onAuthStateChanged,
+-  User,
+-} from 'firebase/auth';
+-import {
+   auth,
++  consumeOAuthFreshSignInFlag,
++  onAuthStateChanged,
+   registerWithEmail,
+   sendPasswordReset,
+   signInWithEmail,
+   signInWithGoogle,
+   signOutUser,
+-} from './firebase';
++  type User,
++} from './lib/auth';
+ import { apiClient } from './lib/apiClient';
+ import {
+   BookmarkItem,
+@@ -481,7 +480,7 @@
+     await signOutUser();
+   };
+ 
+-  // Firebase Auth listener with pre-sync decision gate on login
++  // Supabase Auth listener (Firebase-compatible facade) with pre-sync decision gate on login
+   useEffect(() => {
+     let cancelled = false;
+     const unsub = onAuthStateChanged(auth, async (currentUser) => {
+@@ -507,7 +506,10 @@
+         // ignore
+       }
+ 
+-      const wasTriggeredByLogin = freshSignInTriggeredRef.current;
++      // V2: Google sign-in uses a full-page OAuth redirect (Supabase) instead of a
++      // Firebase popup, so the "fresh sign-in" marker survives in sessionStorage.
++      const wasTriggeredByLogin =
++        freshSignInTriggeredRef.current || consumeOAuthFreshSignInFlag();
+       freshSignInTriggeredRef.current = false;
+ 
+       // Returning session for already-linked account: attach listeners seamlessly
+@@ -551,7 +553,7 @@
+     };
+   }, []);
+ 
+-  // Load workspace data from Cloud SQL PostgreSQL when signed in & sync choice resolved
++  // Load workspace data from Supabase PostgreSQL when signed in & sync choice resolved
+   useEffect(() => {
+     if (!authReady || !user || syncGateStatus !== 'ready') {
+       if (!user) {
+@@ -2126,7 +2128,7 @@
+       );
+     }
+ 
+-    // Persist atomically to Cloud SQL PostgreSQL
++    // Persist atomically to Supabase PostgreSQL (transactional RPC)
+     if (user) {
+       let extraIdx = reorderedSiblings.length;
+       await apiClient.reorderCategoryTree({
+diff -ru -x '*.test.*' orig/MyFav-main/src/components/ChromeSyncPage.tsx MyFav-V2/src/components/ChromeSyncPage.tsx
+--- orig/MyFav-main/src/components/ChromeSyncPage.tsx	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/components/ChromeSyncPage.tsx	2026-11-17 11:19:05.077669021 +0300
+@@ -13,7 +13,7 @@
+   ShieldCheck,
+   FolderOpen,
+ } from 'lucide-react';
+-import { User } from 'firebase/auth';
++import type { User } from '../lib/auth';
+ import {
+   ChromeImportPlan,
+   parseChromeBookmarksExactArrangement,
+Only in MyFav-V2/src/components: PasswordRecoveryModal.tsx
+diff -ru -x '*.test.*' orig/MyFav-main/src/components/SettingsModal.tsx MyFav-V2/src/components/SettingsModal.tsx
+--- orig/MyFav-main/src/components/SettingsModal.tsx	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/components/SettingsModal.tsx	2026-11-17 11:19:05.076897671 +0300
+@@ -29,7 +29,7 @@
+   Braces,
+   HardDriveDownload,
+ } from 'lucide-react';
+-import { User } from 'firebase/auth';
++import type { User } from '../lib/auth';
+ import {
+   BookmarkItem,
+   CardDensity,
+diff -ru -x '*.test.*' orig/MyFav-main/src/components/ShareCategoryModal.tsx MyFav-V2/src/components/ShareCategoryModal.tsx
+--- orig/MyFav-main/src/components/ShareCategoryModal.tsx	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/components/ShareCategoryModal.tsx	2026-11-17 11:19:05.076015419 +0300
+@@ -11,7 +11,7 @@
+   Lock,
+   Sparkles,
+ } from 'lucide-react';
+-import { User } from 'firebase/auth';
++import type { User } from '../lib/auth';
+ import { BookmarkItem, CategoryItem, SharedCategoryRecord } from '../types';
+ import { CategoryIcon } from './CategoryIcon';
+ 
+Only in orig/MyFav-main/src: db
+Only in orig/MyFav-main/src: firebase.ts
+diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/apiClient.ts
+--- orig/MyFav-main/src/lib/apiClient.ts	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/lib/apiClient.ts	2026-11-17 11:19:05.071924598 +0300
+@@ -1,4 +1,34 @@
+-import { auth } from '../firebase';
++/**
++ * MyFav V2 data client.
++ *
++ * Keeps the exact exported contract of the original `apiClient`
++ * (src/lib/apiClient.ts in MyFav-main) so App.tsx and every component are
++ * unchanged, but talks to Supabase (PostgREST + RLS + transactional RPCs)
++ * instead of the original Express/Drizzle server.
++ *
++ * Original route              -> V2 implementation
++ * GET    /api/workspace       -> 5 owner-scoped selects (paged, RLS)
++ * POST   /api/workspace/sync-local -> rpc myfav_sync_local_workspace (atomic)
++ * DELETE /api/workspace       -> rpc myfav_clear_workspace (atomic)
++ * POST   /api/workspace/import-plan -> rpc myfav_import_chrome_plan (atomic)
++ * POST   /api/bookmarks       -> rpc myfav_save_bookmark
++ * PATCH  /api/bookmarks/:id/favorite -> update bookmarks
++ * DELETE /api/bookmarks/:id   -> delete bookmarks
++ * POST   /api/bookmarks/batch-edit   -> rpc myfav_batch_edit_bookmarks (atomic)
++ * POST   /api/bookmarks/batch-delete -> rpc myfav_batch_delete_bookmarks (atomic)
++ * POST   /api/shortcuts       -> rpc myfav_save_quick_shortcut
++ * DELETE /api/shortcuts/:id   -> delete quick_shortcuts
++ * PUT    /api/shortcuts/reorder -> rpc myfav_reorder_quick_shortcuts (atomic)
++ * POST   /api/categories      -> rpc myfav_create_category
++ * PUT    /api/categories/reorder -> rpc myfav_reorder_category_tree (atomic)
++ * PATCH  /api/categories/:id  -> update categories
++ * DELETE /api/categories/:id  -> rpc myfav_delete_category (atomic)
++ * PUT    /api/settings        -> upsert user_settings
++ * POST   /api/shares          -> rpc myfav_publish_share
++ * DELETE /api/shares/:shareId -> delete shared_categories
++ * GET    /api/shares/:shareId -> rpc get_public_share (anonymous, whitelisted)
++ */
++import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
+ import type {
+   BookmarkItem,
+   CategoryItem,
+@@ -7,6 +37,20 @@
+   UserSettings,
+ } from '../types';
+ import type { ChromeImportPlan } from '../utils/chromeBookmarksParser';
++import { requireSupabase } from './supabaseClient';
++import {
++  mapBookmark,
++  mapCategory,
++  mapQuickShortcut,
++  mapSettings,
++  mapShare,
++  settingsToRow,
++  type BookmarkRow,
++  type CategoryRow,
++  type QuickShortcutRow,
++  type SharedCategoryRow,
++  type UserSettingsRow,
++} from './repositories/mappers';
+ 
+ export interface WorkspacePayload {
+   categories: CategoryItem[];
+@@ -16,230 +60,389 @@
+   sharedCategories: SharedCategoryRecord[];
+ }
+ 
+-async function getAuthHeaders(includeJson = false): Promise<Record<string, string>> {
+-  const headers: Record<string, string> = {};
+-  if (includeJson) {
+-    headers['Content-Type'] = 'application/json';
+-  }
+-  const currentUser = auth.currentUser;
+-  if (currentUser) {
+-    const token = await currentUser.getIdToken();
+-    headers['Authorization'] = `Bearer ${token}`;
++const PAGE_SIZE = 1000;
++
++/** Original server error strings, preserved so any UI that shows them is unchanged. */
++const MSG = {
++  workspace: 'Failed to load workspace data',
++  sync: 'Failed to sync local data',
++  clear: 'Failed to clear workspace',
++  importPlan: 'Failed to import bookmarks',
++  saveBookmark: 'Failed to save website',
++  favorite: 'Failed to toggle favorite',
++  deleteBookmark: 'Failed to delete website',
++  batchEdit: 'Failed to update selected websites',
++  batchDelete: 'Failed to delete selected websites',
++  saveShortcut: 'Failed to save shortcut',
++  deleteShortcut: 'Failed to delete shortcut',
++  reorderShortcuts: 'Failed to reorder shortcuts',
++  createCategory: 'Failed to create category',
++  reorderCategories: 'Failed to reorder categories',
++  updateCategory: 'Failed to update category',
++  deleteCategory: 'Failed to delete category',
++  settings: 'Failed to update settings',
++  share: 'Failed to share category',
++  revoke: 'Failed to revoke share link',
++  shareNotFound: 'Shared collection not found',
++  shareLoad: 'Failed to load shared collection',
++  auth: 'Unauthorized: Missing token',
++} as const;
++
++export class ApiError extends Error {
++  cause?: unknown;
++  constructor(message: string, cause?: unknown) {
++    super(message);
++    this.name = 'ApiError';
++    this.cause = cause;
+   }
+-  return headers;
+ }
+ 
+-async function apiRequest<T>(
+-  url: string,
+-  options: {
+-    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+-    body?: unknown;
+-    requireAuthHeader?: boolean;
+-  } = {}
+-): Promise<T> {
+-  const { method = 'GET', body, requireAuthHeader = true } = options;
+-  const hasBody = body !== undefined;
+-  const headers = requireAuthHeader
+-    ? await getAuthHeaders(hasBody)
+-    : hasBody
+-    ? { 'Content-Type': 'application/json' }
+-    : {};
+-
+-  const response = await fetch(url, {
+-    method,
+-    headers,
+-    ...(hasBody ? { body: JSON.stringify(body) } : {}),
+-  });
+-
+-  if (!response.ok) {
+-    let errMsg = `Request failed (${response.status})`;
+-    try {
+-      const errBody = await response.json();
+-      if (errBody?.error) errMsg = errBody.error;
+-    } catch {
+-      // ignore non-JSON error body
+-    }
+-    throw new Error(errMsg);
++function fail(message: string, error: PostgrestError | Error | null | unknown): never {
++  if (error && typeof console !== 'undefined') {
++    console.error(`[MyFav] ${message}:`, error);
+   }
++  throw new ApiError(message, error);
++}
+ 
+-  return response.json() as Promise<T>;
++async function requireUserId(client: SupabaseClient): Promise<string> {
++  const { data, error } = await client.auth.getSession();
++  const uid = data.session?.user?.id;
++  if (error || !uid) fail(MSG.auth, error);
++  return uid;
+ }
+ 
+-export const apiClient = {
+-  getWorkspace: () => apiRequest<WorkspacePayload>('/api/workspace'),
++async function selectAll<T>(
++  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: PostgrestError | null }>,
++  message: string
++): Promise<T[]> {
++  const out: T[] = [];
++  for (let from = 0; ; from += PAGE_SIZE) {
++    const { data, error } = await build(from, from + PAGE_SIZE - 1);
++    if (error) fail(message, error);
++    const rows = data ?? [];
++    out.push(...rows);
++    if (rows.length < PAGE_SIZE) break;
++  }
++  return out;
++}
+ 
+-  syncLocalWorkspace: (payload: {
+-    categories: CategoryItem[];
+-    bookmarks: BookmarkItem[];
+-    quickShortcuts: QuickShortcutItem[];
+-  }) =>
+-    apiRequest<WorkspacePayload>('/api/workspace/sync-local', {
+-      method: 'POST',
+-      body: payload,
+-    }),
+-
+-  clearWorkspace: () =>
+-    apiRequest<{ ok: boolean }>('/api/workspace', { method: 'DELETE' }),
+-
+-  importChromePlan: (plan: ChromeImportPlan, replaceAllExisting: boolean) =>
+-    apiRequest<{
+-      summary: {
++export function createApiClient(getClient: () => SupabaseClient = requireSupabase) {
++  const loadWorkspace = async (): Promise<WorkspacePayload> => {
++    const client = getClient();
++    const uid = await requireUserId(client);
++    const [cats, bms, scs, settingsRes, shares] = await Promise.all([
++      selectAll<CategoryRow>(
++        (a, b) =>
++          client
++            .from('categories')
++            .select('owner_id,id,name,icon,parent_id,sort_order,created_at,updated_at')
++            .eq('owner_id', uid)
++            .order('sort_order', { ascending: true })
++            .order('created_at', { ascending: true })
++            .order('seq', { ascending: true })
++            .range(a, b),
++        MSG.workspace
++      ),
++      selectAll<BookmarkRow>(
++        (a, b) =>
++          client
++            .from('bookmarks')
++            .select(
++              'owner_id,id,title,url,description,category_id,subcategory_id,is_favorite,created_at,updated_at'
++            )
++            .eq('owner_id', uid)
++            .order('created_at', { ascending: true })
++            .order('seq', { ascending: true })
++            .range(a, b),
++        MSG.workspace
++      ),
++      selectAll<QuickShortcutRow>(
++        (a, b) =>
++          client
++            .from('quick_shortcuts')
++            .select('owner_id,id,title,url,icon_type,custom_icon,sort_order,created_at,updated_at')
++            .eq('owner_id', uid)
++            .order('sort_order', { ascending: true })
++            .order('created_at', { ascending: true })
++            .order('seq', { ascending: true })
++            .range(a, b),
++        MSG.workspace
++      ),
++      client
++        .from('user_settings')
++        .select('owner_id,theme_mode,primary_color,glass_intensity,card_density,updated_at')
++        .eq('owner_id', uid)
++        .maybeSingle(),
++      selectAll<SharedCategoryRow>(
++        (a, b) =>
++          client
++            .from('shared_categories')
++            .select('*')
++            .eq('owner_id', uid)
++            .order('created_at', { ascending: true })
++            .range(a, b),
++        MSG.workspace
++      ),
++    ]);
++    if (settingsRes.error) fail(MSG.workspace, settingsRes.error);
++
++    return {
++      categories: cats.map(mapCategory),
++      bookmarks: bms.map(mapBookmark),
++      quickShortcuts: scs.map(mapQuickShortcut),
++      settings: settingsRes.data ? mapSettings(settingsRes.data as UserSettingsRow) : null,
++      sharedCategories: shares.map(mapShare),
++    };
++  };
++
++  const rpc = async <T>(fn: string, args: Record<string, unknown>, message: string): Promise<T> => {
++    const client = getClient();
++    await requireUserId(client);
++    const { data, error } = await client.rpc(fn, args);
++    if (error) fail(message, error);
++    return data as T;
++  };
++
++  return {
++    getWorkspace: loadWorkspace,
++
++    syncLocalWorkspace: async (payload: {
++      categories: CategoryItem[];
++      bookmarks: BookmarkItem[];
++      quickShortcuts: QuickShortcutItem[];
++    }): Promise<WorkspacePayload> => {
++      await rpc(
++        'myfav_sync_local_workspace',
++        {
++          p_payload: {
++            categories: Array.isArray(payload.categories) ? payload.categories : [],
++            bookmarks: Array.isArray(payload.bookmarks) ? payload.bookmarks : [],
++            quickShortcuts: Array.isArray(payload.quickShortcuts) ? payload.quickShortcuts : [],
++          },
++        },
++        MSG.sync
++      );
++      return loadWorkspace();
++    },
++
++    clearWorkspace: async () => {
++      await rpc('myfav_clear_workspace', {}, MSG.clear);
++      return { ok: true };
++    },
++
++    importChromePlan: async (plan: ChromeImportPlan, replaceAllExisting: boolean) => {
++      if (!plan || !Array.isArray(plan.categories) || !Array.isArray(plan.bookmarks)) {
++        fail('Invalid import plan payload', null);
++      }
++      const summary = await rpc<{
+         addedCategories: number;
+         addedBookmarks: number;
+         skippedDuplicates: number;
+         expandedCategoryIds: string[];
+-      };
+-      workspace: WorkspacePayload;
+-    }>('/api/workspace/import-plan', {
+-      method: 'POST',
+-      body: { plan, replaceAllExisting },
+-    }),
+-
+-  saveBookmark: (data: {
+-    id?: string;
+-    title: string;
+-    url: string;
+-    description: string;
+-    categoryId: string;
+-    subcategoryId: string;
+-    isFavorite: boolean;
+-  }) =>
+-    apiRequest<BookmarkItem>('/api/bookmarks', {
+-      method: 'POST',
+-      body: data,
+-    }),
+-
+-  toggleFavorite: (id: string, isFavorite: boolean) =>
+-    apiRequest<{ ok: boolean }>(`/api/bookmarks/${encodeURIComponent(id)}/favorite`, {
+-      method: 'PATCH',
+-      body: { isFavorite },
+-    }),
+-
+-  deleteBookmark: (id: string) =>
+-    apiRequest<{ ok: boolean }>(`/api/bookmarks/${encodeURIComponent(id)}`, {
+-      method: 'DELETE',
+-    }),
+-
+-  batchEditBookmarks: (payload: {
+-    bookmarkIds: string[];
+-    category?: { categoryId: string; subcategoryId: string };
+-    favoriteStatus: 'keep' | 'favorite' | 'unfavorite';
+-  }) =>
+-    apiRequest<{ ok: boolean }>('/api/bookmarks/batch-edit', {
+-      method: 'POST',
+-      body: payload,
+-    }),
+-
+-  batchDeleteBookmarks: (bookmarkIds: string[]) =>
+-    apiRequest<{ ok: boolean }>('/api/bookmarks/batch-delete', {
+-      method: 'POST',
+-      body: { bookmarkIds },
+-    }),
+-
+-  saveQuickShortcut: (data: {
+-    id?: string;
+-    title: string;
+-    url: string;
+-    iconType: 'favicon' | 'lucide' | 'custom';
+-    customIcon: string;
+-  }) =>
+-    apiRequest<QuickShortcutItem>('/api/shortcuts', {
+-      method: 'POST',
+-      body: data,
+-    }),
+-
+-  deleteQuickShortcut: (id: string) =>
+-    apiRequest<{ ok: boolean }>(`/api/shortcuts/${encodeURIComponent(id)}`, {
+-      method: 'DELETE',
+-    }),
+-
+-  reorderQuickShortcuts: (orderedIds: string[]) =>
+-    apiRequest<{ ok: boolean }>('/api/shortcuts/reorder', {
+-      method: 'PUT',
+-      body: { orderedIds },
+-    }),
+-
+-  createCategory: (data: {
+-    id?: string;
+-    name: string;
+-    icon: string;
+-    parentId: string;
+-  }) =>
+-    apiRequest<CategoryItem>('/api/categories', {
+-      method: 'POST',
+-      body: data,
+-    }),
+-
+-  updateCategory: (id: string, data: { name: string; icon: string }) =>
+-    apiRequest<{ ok: boolean }>(`/api/categories/${encodeURIComponent(id)}`, {
+-      method: 'PATCH',
+-      body: data,
+-    }),
+-
+-  deleteCategory: (id: string, fallbackCategoryId?: string) => {
+-    const qs = fallbackCategoryId
+-      ? `?fallbackCategoryId=${encodeURIComponent(fallbackCategoryId)}`
+-      : '';
+-    return apiRequest<{ ok: boolean }>(
+-      `/api/categories/${encodeURIComponent(id)}${qs}`,
+-      { method: 'DELETE' }
+-    );
+-  },
+-
+-  reorderCategoryTree: (payload: {
+-    draggedId: string;
+-    newParentId: string;
+-    reorderedSiblings: Array<{ id: string; order: number }>;
+-    childSubsToMove: Array<{ id: string; order: number }>;
+-    bookmarksToUpdate: Array<{
+-      id: string;
+-      categoryId: string;
+-      subcategoryId: string;
+-    }>;
+-  }) =>
+-    apiRequest<{ ok: boolean }>('/api/categories/reorder', {
+-      method: 'PUT',
+-      body: payload,
+-    }),
+-
+-  updateSettings: (settings: {
+-    themeMode?: string;
+-    primaryColor: string;
+-    glassIntensity: string;
+-    cardDensity: string;
+-  }) =>
+-    apiRequest<{ ok: boolean }>('/api/settings', {
+-      method: 'PUT',
+-      body: settings,
+-    }),
+-
+-  publishOrUpdateShare: (payload: {
+-    existingShareId?: string;
+-    categoryId: string;
+-    categoryName: string;
+-    categoryIcon: string;
+-    subcategories: Array<{ id: string; name: string; icon: string; order: number }>;
+-    bookmarks: Array<{
++      }>(
++        'myfav_import_chrome_plan',
++        { p_plan: plan, p_replace_all: Boolean(replaceAllExisting) },
++        MSG.importPlan
++      );
++      const workspace = await loadWorkspace();
++      return { summary, workspace };
++    },
++
++    saveBookmark: async (data: {
++      id?: string;
+       title: string;
+       url: string;
+       description: string;
++      categoryId: string;
+       subcategoryId: string;
+       isFavorite: boolean;
+-    }>;
+-  }) =>
+-    apiRequest<SharedCategoryRecord>('/api/shares', {
+-      method: 'POST',
+-      body: payload,
+-    }),
+-
+-  revokeShare: (shareId: string) =>
+-    apiRequest<{ ok: boolean }>(`/api/shares/${encodeURIComponent(shareId)}`, {
+-      method: 'DELETE',
+-    }),
+-
+-  getPublicShare: (shareId: string) =>
+-    apiRequest<SharedCategoryRecord>(
+-      `/api/shares/${encodeURIComponent(shareId)}`,
+-      { requireAuthHeader: false }
+-    ),
+-};
++    }): Promise<BookmarkItem> => {
++      const row = await rpc<BookmarkRow>('myfav_save_bookmark', { p: data }, MSG.saveBookmark);
++      return mapBookmark(row);
++    },
++
++    toggleFavorite: async (id: string, isFavorite: boolean) => {
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client
++        .from('bookmarks')
++        .update({ is_favorite: Boolean(isFavorite) })
++        .eq('owner_id', uid)
++        .eq('id', id);
++      if (error) fail(MSG.favorite, error);
++      return { ok: true };
++    },
++
++    deleteBookmark: async (id: string) => {
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client.from('bookmarks').delete().eq('owner_id', uid).eq('id', id);
++      if (error) fail(MSG.deleteBookmark, error);
++      return { ok: true };
++    },
++
++    batchEditBookmarks: async (payload: {
++      bookmarkIds: string[];
++      category?: { categoryId: string; subcategoryId: string };
++      favoriteStatus: 'keep' | 'favorite' | 'unfavorite';
++    }) => {
++      const ids = Array.isArray(payload.bookmarkIds) ? payload.bookmarkIds : [];
++      if (ids.length === 0) return { ok: true };
++      await rpc(
++        'myfav_batch_edit_bookmarks',
++        {
++          p_ids: ids,
++          p_category_id: payload.category?.categoryId || null,
++          p_subcategory_id: payload.category?.categoryId ? payload.category.subcategoryId || '' : null,
++          p_favorite_status: payload.favoriteStatus || 'keep',
++        },
++        MSG.batchEdit
++      );
++      return { ok: true };
++    },
++
++    batchDeleteBookmarks: async (bookmarkIds: string[]) => {
++      const ids = Array.isArray(bookmarkIds) ? bookmarkIds : [];
++      if (ids.length === 0) return { ok: true };
++      await rpc('myfav_batch_delete_bookmarks', { p_ids: ids }, MSG.batchDelete);
++      return { ok: true };
++    },
++
++    saveQuickShortcut: async (data: {
++      id?: string;
++      title: string;
++      url: string;
++      iconType: 'favicon' | 'lucide' | 'custom';
++      customIcon: string;
++    }): Promise<QuickShortcutItem> => {
++      const row = await rpc<QuickShortcutRow>('myfav_save_quick_shortcut', { p: data }, MSG.saveShortcut);
++      return mapQuickShortcut(row);
++    },
++
++    deleteQuickShortcut: async (id: string) => {
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client.from('quick_shortcuts').delete().eq('owner_id', uid).eq('id', id);
++      if (error) fail(MSG.deleteShortcut, error);
++      return { ok: true };
++    },
++
++    reorderQuickShortcuts: async (orderedIds: string[]) => {
++      await rpc(
++        'myfav_reorder_quick_shortcuts',
++        { p_ordered_ids: Array.isArray(orderedIds) ? orderedIds : [] },
++        MSG.reorderShortcuts
++      );
++      return { ok: true };
++    },
++
++    createCategory: async (data: {
++      id?: string;
++      name: string;
++      icon: string;
++      parentId: string;
++    }): Promise<CategoryItem> => {
++      const row = await rpc<CategoryRow>(
++        'myfav_create_category',
++        {
++          p_id: data.id ?? null,
++          p_name: data.name,
++          p_icon: data.icon,
++          p_parent_id: data.parentId || '',
++        },
++        MSG.createCategory
++      );
++      return mapCategory(row);
++    },
++
++    updateCategory: async (id: string, data: { name: string; icon: string }) => {
++      const cleanName = (data.name || '').trim().slice(0, 80);
++      if (!cleanName) return { ok: true };
++      const icon = data.icon && /^[a-zA-Z0-9_-]{1,40}$/.test(data.icon) ? data.icon : 'bookmark';
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client
++        .from('categories')
++        .update({ name: cleanName, icon })
++        .eq('owner_id', uid)
++        .eq('id', id);
++      if (error) fail(MSG.updateCategory, error);
++      return { ok: true };
++    },
++
++    deleteCategory: async (id: string, fallbackCategoryId?: string) => {
++      await rpc(
++        'myfav_delete_category',
++        { p_id: id, p_fallback_category_id: fallbackCategoryId || null },
++        MSG.deleteCategory
++      );
++      return { ok: true };
++    },
++
++    reorderCategoryTree: async (payload: {
++      draggedId: string;
++      newParentId: string;
++      reorderedSiblings: Array<{ id: string; order: number }>;
++      childSubsToMove: Array<{ id: string; order: number }>;
++      bookmarksToUpdate: Array<{ id: string; categoryId: string; subcategoryId: string }>;
++    }) => {
++      await rpc('myfav_reorder_category_tree', { p_payload: payload }, MSG.reorderCategories);
++      return { ok: true };
++    },
++
++    updateSettings: async (settings: {
++      themeMode?: string;
++      primaryColor: string;
++      glassIntensity: string;
++      cardDensity: string;
++    }) => {
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client
++        .from('user_settings')
++        .upsert(settingsToRow(uid, settings), { onConflict: 'owner_id' });
++      if (error) fail(MSG.settings, error);
++      return { ok: true };
++    },
++
++    publishOrUpdateShare: async (payload: {
++      existingShareId?: string;
++      categoryId: string;
++      categoryName: string;
++      categoryIcon: string;
++      subcategories: Array<{ id: string; name: string; icon: string; order: number }>;
++      bookmarks: Array<{
++        title: string;
++        url: string;
++        description: string;
++        subcategoryId: string;
++        isFavorite: boolean;
++      }>;
++    }): Promise<SharedCategoryRecord> => {
++      const row = await rpc<SharedCategoryRow>('myfav_publish_share', { p: payload }, MSG.share);
++      return mapShare(row);
++    },
++
++    revokeShare: async (shareId: string) => {
++      const client = getClient();
++      const uid = await requireUserId(client);
++      const { error } = await client
++        .from('shared_categories')
++        .delete()
++        .eq('owner_id', uid)
++        .eq('id', shareId);
++      if (error) fail(MSG.revoke, error);
++      return { ok: true };
++    },
++
++    getPublicShare: async (shareId: string): Promise<SharedCategoryRecord> => {
++      const client = getClient();
++      const { data, error } = await client.rpc('get_public_share', { p_share_id: shareId });
++      if (error) fail(MSG.shareLoad, error);
++      if (!data) fail(MSG.shareNotFound, null);
++      return data as SharedCategoryRecord;
++    },
++  };
++}
++
++export const apiClient = createApiClient();
+Only in MyFav-V2/src/lib: auth.ts
+Only in orig/MyFav-main/src/lib: firebase-admin.ts
+Only in MyFav-V2/src/lib: repositories
+Only in MyFav-V2/src/lib: supabaseClient.ts
+diff -ru -x '*.test.*' orig/MyFav-main/src/main.tsx MyFav-V2/src/main.tsx
+--- orig/MyFav-main/src/main.tsx	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/main.tsx	2026-11-17 11:19:50.027597300 +0300
+@@ -1,10 +1,12 @@
+ import { createRoot } from 'react-dom/client';
+ import App from './App.tsx';
+ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
++import { PasswordRecoveryModal } from './components/PasswordRecoveryModal.tsx';
+ import './index.css';
+ 
+ createRoot(document.getElementById('root')!).render(
+   <ErrorBoundary>
+     <App />
++    <PasswordRecoveryModal />
+   </ErrorBoundary>
+ );
+Only in orig/MyFav-main/src: middleware
+diff -ru -x '*.test.*' orig/MyFav-main/src/utils/analytics.ts MyFav-V2/src/utils/analytics.ts
+--- orig/MyFav-main/src/utils/analytics.ts	2026-11-16 12:33:49.000000000 +0300
++++ MyFav-V2/src/utils/analytics.ts	2026-11-17 11:17:05.725528285 +0300
+@@ -1,6 +1,6 @@
+-import { getAnalytics, isSupported, logEvent } from 'firebase/analytics';
+-import firebaseConfig from '../../firebase-applet-config.json';
+-import { app } from '../firebase';
++// MyFav V2: the Firebase Analytics SDK bridge was removed together with Firebase.
++// In the original, firebase-applet-config.json had an empty measurementId, so the
++// Firebase branch never activated; GA4 (gtag) and GTM behaviour is unchanged.
+ 
+ declare global {
+   interface Window {
+@@ -17,19 +17,13 @@
+ 
+ let initializedMeasurementId: string | null = null;
+ let initializedGtmId: string | null = null;
+-let firebaseAnalyticsInstance: ReturnType<typeof getAnalytics> | null = null;
+ 
+ export function getConfiguredMeasurementId(): string {
+   const envId =
+     typeof import.meta !== 'undefined' && import.meta.env?.VITE_GA_MEASUREMENT_ID
+       ? String(import.meta.env.VITE_GA_MEASUREMENT_ID).trim()
+       : '';
+-  const fbId =
+-    typeof firebaseConfig.measurementId === 'string'
+-      ? firebaseConfig.measurementId.trim()
+-      : '';
+-
+-  const candidate = envId || fbId || DEFAULT_GA4_MEASUREMENT_ID;
++  const candidate = envId || DEFAULT_GA4_MEASUREMENT_ID;
+   return VALID_GA4_ID_REGEX.test(candidate) ? candidate : '';
+ }
+ 
+@@ -110,21 +104,6 @@
+       document.head.appendChild(script);
+     }
+   }
+-
+-  // Also connect Firebase Analytics SDK if firebase-applet-config.json includes measurementId
+-  if (
+-    typeof firebaseConfig.measurementId === 'string' &&
+-    VALID_GA4_ID_REGEX.test(firebaseConfig.measurementId.trim())
+-  ) {
+-    try {
+-      const supported = await isSupported();
+-      if (supported) {
+-        firebaseAnalyticsInstance = getAnalytics(app);
+-      }
+-    } catch {
+-      // Gracefully ignore in unsupported environments or blocked contexts
+-    }
+-  }
+ }
+ 
+ export function trackPageView(pagePath: string, pageTitle: string): void {
+@@ -149,12 +128,6 @@
+         send_to: measurementId,
+       });
+     }
+-    if (firebaseAnalyticsInstance) {
+-      logEvent(firebaseAnalyticsInstance, 'page_view', {
+-        page_path: pagePath,
+-        page_title: pageTitle,
+-      });
+-    }
+   } catch {
+     // Never let analytics disrupt app navigation
+   }
+@@ -183,9 +156,6 @@
+         send_to: measurementId,
+       });
+     }
+-    if (firebaseAnalyticsInstance) {
+-      logEvent(firebaseAnalyticsInstance, eventName, params);
+-    }
+   } catch {
+     // Never let analytics disrupt user actions
+   }

@@ -1,0 +1,36 @@
+
+> myfav-v2@2.0.0 test
+> vitest run tests/unit
+
+
+ RUN  v4.0.8 /home/claude/MyFav-V2
+
+ ✓ tests/unit/parser.test.ts (8 tests) 858ms
+     ✓ every bookmark points at a category that exists in the plan  801ms
+ ✓ tests/unit/authFacade.test.ts (16 tests) 55ms
+stderr | tests/unit/apiClient.test.ts
+[MyFav] Supabase is not configured — running in local-only mode.
+ - VITE_SUPABASE_URL is not set.
+ - VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) is not set.
+
+stderr | tests/unit/apiClient.test.ts > apiClient (Supabase implementation of the original contract) > surfaces the original server error strings
+[MyFav] Failed to sync local data: { message: 'boom', code: '23514' }
+
+stderr | tests/unit/apiClient.test.ts > apiClient (Supabase implementation of the original contract) > surfaces the original server error strings
+[MyFav] Failed to clear workspace: { message: 'boom', code: '23514' }
+
+ ✓ tests/unit/apiClient.test.ts (5 tests) 26ms
+ ✓ tests/unit/backupExport.test.ts (3 tests) 7ms
+ ✓ tests/unit/mappers.test.ts (5 tests) 6ms
+stderr | tests/unit/supabaseEnv.test.ts
+[MyFav] Supabase is not configured — running in local-only mode.
+ - VITE_SUPABASE_URL is not set.
+ - VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) is not set.
+
+ ✓ tests/unit/supabaseEnv.test.ts (4 tests) 4ms
+
+ Test Files  6 passed (6)
+      Tests  41 passed (41)
+   Start at  11:53:01
+   Duration  3.26s (transform 403ms, setup 0ms, collect 586ms, tests 956ms, environment 850ms, prepare 29ms)
+

@@ -1,0 +1,5 @@
+
+> myfav-v2@2.0.0 lint
+> tsc --noEmit && node scripts/check-forbidden.mjs
+
+Forbidden-content check passed (no Firebase/Express/Drizzle/pg runtime, no hard-coded secrets).
