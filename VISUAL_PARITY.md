@@ -6,7 +6,7 @@
 - **Driver:** `tests/visual/compare.mjs` using Playwright 1.63 with Chromium (headless shell build 1243), device scale factor 1, dark colour scheme, fixed clock `2026-11-17T09:00:00Z`, CSS animations disabled at capture, pointer parked at (0,0).
 - **Same data:** identical seeded localStorage workspace (`tests/visual/seed.mjs`: 4 root categories, 3 subcategories, 8 websites incl. Arabic text, 3 quick shortcuts) or an empty workspace.
 - **Network:** every non-localhost request is blocked in **both** runs. Google Fonts, favicons and analytics therefore fall back identically. **Limitation:** the comparison does not exercise the real web fonts or remote favicons, but these come from the same `index.html`/component code in both builds.
-- **Diff:** `pixelmatch` with threshold 0.1, full-viewport (one full-page) PNGs. Output is in `tests/visual/output/{original,v2}/`. Diff images are generated locally (git-ignored).
+- **Diff:** `pixelmatch` with threshold 0.1, full-viewport (one full-page) PNGs. The screenshots (`tests/visual/output/{original,v2,diff}/`) are generated locally and git-ignored. Only the summary `tests/visual/output/results.json` is committed; re-run `node tests/visual/compare.mjs` to reproduce them.
 
 ## Result: 42 / 42 captures pixel-identical (0 differing pixels) — re-run after the Neon migration, still identical
 
