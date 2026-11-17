@@ -33,7 +33,7 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
-      - name: Apply local Supabase shim + migrations
+      - name: Apply local Neon-equivalent shim + migrations
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
           bash scripts/local-db.sh

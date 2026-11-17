@@ -1,5 +1,5 @@
 -- ============================================================================
--- MyFav V2 — transactional RPCs.
+-- MyFav V2 — transactional RPCs (called through the Neon Data API: client.rpc()).
 --
 -- Every function below is SECURITY INVOKER (runs as the calling
 -- `authenticated` user, so RLS applies to every statement), pins
@@ -618,7 +618,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- Public share read (GET /api/shares/:shareId) — the ONLY anonymous entry
--- point. SECURITY DEFINER because anon has no table access; it returns a
+-- point. SECURITY DEFINER because `anonymous` has no table access; it returns a
 -- single explicitly-published snapshot with whitelisted fields (no owner id,
 -- no email, no settings). Unknown / revoked ids return NULL.
 -- ---------------------------------------------------------------------------
@@ -642,7 +642,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Execute grants: deny by default, allow exactly what is needed.
 -- ---------------------------------------------------------------------------
-revoke execute on all functions in schema public from public, anon;
+revoke execute on all functions in schema public from public, anonymous;
 grant execute on function
   public.myfav_clear_workspace(),
   public.myfav_sync_local_workspace(jsonb),
@@ -655,11 +655,10 @@ grant execute on function
   public.myfav_reorder_category_tree(jsonb),
   public.myfav_publish_share(jsonb)
 to authenticated;
-grant execute on function public.get_public_share(text) to anon, authenticated;
+grant execute on function public.get_public_share(text) to anonymous, authenticated;
 
--- Supabase applies default privileges to new functions in public; make sure
--- future functions are not silently exposed to anon.
-alter default privileges in schema public revoke execute on functions from public, anon;
+-- Make sure future functions in public are not silently exposed to `anonymous`.
+alter default privileges in schema public revoke execute on functions from public, anonymous;
 
 -- ---------------------------------------------------------------------------
 -- Batch edit / delete (POST /api/bookmarks/batch-edit, /batch-delete).
@@ -691,6 +690,6 @@ begin
 end $$;
 
 revoke execute on function public.myfav_batch_edit_bookmarks(text[], text, text, text),
-                           public.myfav_batch_delete_bookmarks(text[]) from public, anon;
+                           public.myfav_batch_delete_bookmarks(text[]) from public, anonymous;
 grant execute on function public.myfav_batch_edit_bookmarks(text[], text, text, text),
                           public.myfav_batch_delete_bookmarks(text[]) to authenticated;

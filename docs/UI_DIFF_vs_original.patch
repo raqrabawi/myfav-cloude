@@ -74,6 +74,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/components/ChromeSyncPage.tsx MyFav-V
  import {
    ChromeImportPlan,
    parseChromeBookmarksExactArrangement,
+Only in MyFav-V2/src/components: EmailVerificationModal.tsx
 Only in MyFav-V2/src/components: PasswordRecoveryModal.tsx
 diff -ru -x '*.test.*' orig/MyFav-main/src/components/SettingsModal.tsx MyFav-V2/src/components/SettingsModal.tsx
 --- orig/MyFav-main/src/components/SettingsModal.tsx	2026-11-16 12:33:49.000000000 +0300
@@ -103,16 +104,16 @@ Only in orig/MyFav-main/src: db
 Only in orig/MyFav-main/src: firebase.ts
 diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/apiClient.ts
 --- orig/MyFav-main/src/lib/apiClient.ts	2026-11-16 12:33:49.000000000 +0300
-+++ MyFav-V2/src/lib/apiClient.ts	2026-11-17 11:19:05.071924598 +0300
-@@ -1,4 +1,34 @@
++++ MyFav-V2/src/lib/apiClient.ts	2026-11-17 14:34:01.237803059 +0300
+@@ -1,4 +1,33 @@
 -import { auth } from '../firebase';
 +/**
 + * MyFav V2 data client.
 + *
 + * Keeps the exact exported contract of the original `apiClient`
 + * (src/lib/apiClient.ts in MyFav-main) so App.tsx and every component are
-+ * unchanged, but talks to Supabase (PostgREST + RLS + transactional RPCs)
-+ * instead of the original Express/Drizzle server.
++ * unchanged, but talks to the Neon Data API (PostgREST-compatible, RLS +
++ * transactional RPCs) instead of the original Express/Drizzle server.
 + *
 + * Original route              -> V2 implementation
 + * GET    /api/workspace       -> 5 owner-scoped selects (paged, RLS)
@@ -136,15 +137,46 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/api
 + * DELETE /api/shares/:shareId -> delete shared_categories
 + * GET    /api/shares/:shareId -> rpc get_public_share (anonymous, whitelisted)
 + */
-+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
  import type {
    BookmarkItem,
    CategoryItem,
-@@ -7,6 +37,20 @@
+@@ -7,6 +36,52 @@
    UserSettings,
  } from '../types';
  import type { ChromeImportPlan } from '../utils/chromeBookmarksParser';
-+import { requireSupabase } from './supabaseClient';
++import { requireNeon } from './neonClient';
++
++/** Minimal structural types for the Data API client (Neon's postgrest-js). */
++interface PostgrestError {
++  message: string;
++  code?: string;
++  details?: string | null;
++  hint?: string | null;
++}
++type QueryResult<T> = PromiseLike<{ data: T | null; error: PostgrestError | null }>;
++interface QueryBuilder<T = unknown> extends QueryResult<T[]> {
++  select(columns?: string): QueryBuilder<T>;
++  eq(column: string, value: unknown): QueryBuilder<T>;
++  in(column: string, values: unknown[]): QueryBuilder<T>;
++  order(column: string, options?: { ascending?: boolean }): QueryBuilder<T>;
++  range(from: number, to: number): QueryBuilder<T>;
++  update(values: Record<string, unknown>): QueryBuilder<T>;
++  delete(): QueryBuilder<T>;
++  upsert(values: Record<string, unknown>, options?: { onConflict?: string }): QueryBuilder<T>;
++  maybeSingle(): QueryResult<T>;
++}
++export interface DataClient {
++  auth: {
++    getSession(): Promise<{
++      data: { session: { user?: { id?: string } | null } | null };
++      error: unknown;
++    }>;
++  };
++  // Rows are typed at each call site via selectAll<T>.
++  // eslint-disable-next-line @typescript-eslint/no-explicit-any
++  from(table: string): QueryBuilder<any>;
++  rpc(fn: string, args?: Record<string, unknown>): QueryResult<unknown>;
++}
 +import {
 +  mapBookmark,
 +  mapCategory,
@@ -161,7 +193,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/api
  
  export interface WorkspacePayload {
    categories: CategoryItem[];
-@@ -16,230 +60,389 @@
+@@ -16,230 +91,391 @@
    sharedCategories: SharedCategoryRecord[];
  }
  
@@ -251,7 +283,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/api
 +}
  
 -  return response.json() as Promise<T>;
-+async function requireUserId(client: SupabaseClient): Promise<string> {
++async function requireUserId(client: DataClient): Promise<string> {
 +  const { data, error } = await client.auth.getSession();
 +  const uid = data.session?.user?.id;
 +  if (error || !uid) fail(MSG.auth, error);
@@ -291,7 +323,9 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/api
 -  importChromePlan: (plan: ChromeImportPlan, replaceAllExisting: boolean) =>
 -    apiRequest<{
 -      summary: {
-+export function createApiClient(getClient: () => SupabaseClient = requireSupabase) {
++export function createApiClient(
++  getClient: () => DataClient = () => requireNeon() as unknown as DataClient
++) {
 +  const loadWorkspace = async (): Promise<WorkspacePayload> => {
 +    const client = getClient();
 +    const uid = await requireUserId(client);
@@ -763,14 +797,15 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts MyFav-V2/src/lib/api
 +export const apiClient = createApiClient();
 Only in MyFav-V2/src/lib: auth.ts
 Only in orig/MyFav-main/src/lib: firebase-admin.ts
+Only in MyFav-V2/src/lib: neonClient.ts
 Only in MyFav-V2/src/lib: repositories
-Only in MyFav-V2/src/lib: supabaseClient.ts
 diff -ru -x '*.test.*' orig/MyFav-main/src/main.tsx MyFav-V2/src/main.tsx
 --- orig/MyFav-main/src/main.tsx	2026-11-16 12:33:49.000000000 +0300
-+++ MyFav-V2/src/main.tsx	2026-11-17 11:19:50.027597300 +0300
-@@ -1,10 +1,12 @@
++++ MyFav-V2/src/main.tsx	2026-11-17 14:37:15.379168272 +0300
+@@ -1,10 +1,14 @@
  import { createRoot } from 'react-dom/client';
  import App from './App.tsx';
++import { EmailVerificationModal } from './components/EmailVerificationModal.tsx';
  import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 +import { PasswordRecoveryModal } from './components/PasswordRecoveryModal.tsx';
  import './index.css';
@@ -779,6 +814,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/main.tsx MyFav-V2/src/main.tsx
    <ErrorBoundary>
      <App />
 +    <PasswordRecoveryModal />
++    <EmailVerificationModal />
    </ErrorBoundary>
  );
 Only in orig/MyFav-main/src: middleware

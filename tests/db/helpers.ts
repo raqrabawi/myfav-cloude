@@ -1,6 +1,6 @@
 /**
- * Test harness that executes SQL exactly the way Supabase's PostgREST does:
- * inside a transaction, `SET LOCAL ROLE authenticated|anon` and the JWT claims
+ * Test harness that executes SQL exactly the way the Neon Data API (PostgREST) does:
+ * inside a transaction, `SET LOCAL ROLE authenticated|anonymous` and the JWT claims
  * in `request.jwt.claims`. Deferred constraint triggers fire at COMMIT, so
  * every call commits (or reports the commit-time error).
  */
@@ -22,11 +22,11 @@ export async function resetData() {
   await pool.query(`
     truncate public.shared_categories, public.bookmarks, public.quick_shortcuts,
              public.user_settings, public.categories cascade;
-    delete from auth.users;
-    insert into auth.users (id, email, email_confirmed_at) values
-      ('${USER_A}', 'a@example.com', now()),
-      ('${USER_B}', 'b@example.com', now()),
-      ('${USER_UNVERIFIED}', 'c@example.com', null);
+    delete from neon_auth."user";
+    insert into neon_auth."user" (id, email, "emailVerified") values
+      ('${USER_A}', 'a@example.com', true),
+      ('${USER_B}', 'b@example.com', true),
+      ('${USER_UNVERIFIED}', 'c@example.com', false);
   `);
 }
 
@@ -37,7 +37,7 @@ export interface RunResult<T = Record<string, unknown>> {
 
 /** Runs one or more statements as `role` with `sub` claim, in one transaction. */
 export async function runAs<T = Record<string, unknown>>(
-  who: { role: 'authenticated' | 'anon'; sub?: string },
+  who: { role: 'authenticated' | 'anonymous'; sub?: string },
   sql: string,
   params: unknown[] = []
 ): Promise<RunResult<T>> {
@@ -70,7 +70,7 @@ export const asB = <T = Record<string, unknown>>(sql: string, params: unknown[] 
 export const asUnverified = <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
   runAs<T>({ role: 'authenticated', sub: USER_UNVERIFIED }, sql, params);
 export const asAnon = <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
-  runAs<T>({ role: 'anon' }, sql, params);
+  runAs<T>({ role: 'anonymous' }, sql, params);
 
 /** Superuser read for assertions (bypasses RLS). */
 export async function adminRows<T = Record<string, unknown>>(sql: string, params: unknown[] = []) {

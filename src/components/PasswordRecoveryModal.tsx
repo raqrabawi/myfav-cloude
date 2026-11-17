@@ -1,29 +1,46 @@
 /**
  * V2-only addition (no equivalent screen existed in the original UI because
- * Firebase hosted its own password-reset page). Supabase sends users back to
- * the app with a recovery session, so this dialog lets them choose a new
- * password. It reuses AuthPage's exact classes so it looks like part of the
- * original design system.
+ * Firebase hosted its own password-reset page). Neon Managed Better Auth
+ * sends users back to the app with `?token=<reset token>`, so this dialog lets
+ * them choose a new password. It reuses AuthPage's exact classes so it looks
+ * like part of the original design system.
  */
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Lock, X } from 'lucide-react';
 import { MyFavLogo } from './MyFavLogo';
-import { onPasswordRecovery, updatePassword } from '../lib/auth';
+import {
+  clearPasswordResetParams,
+  completePasswordReset,
+  readPasswordResetRedirect,
+} from '../lib/auth';
 
 export const PasswordRecoveryModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [doneMessage, setDoneMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => onPasswordRecovery(() => setIsOpen(true)), []);
+  useEffect(() => {
+    const redirect = readPasswordResetRedirect();
+    if (!redirect) return;
+    setResetToken(redirect.token);
+    if (redirect.error) {
+      setErrorMessage(
+        'This password reset link is invalid or has expired. Request a new one from the login screen.'
+      );
+    }
+    setIsOpen(true);
+    clearPasswordResetParams();
+  }, []);
 
   if (!isOpen) return null;
 
   const close = () => {
     setIsOpen(false);
+    setResetToken(null);
     setPassword('');
     setConfirmPassword('');
     setErrorMessage('');
@@ -33,8 +50,14 @@ export const PasswordRecoveryModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
+    if (!resetToken) {
+      setErrorMessage(
+        'This password reset link is invalid or has expired. Request a new one from the login screen.'
+      );
+      return;
+    }
+    if (password.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long.');
       return;
     }
     if (password !== confirmPassword) {
@@ -43,8 +66,8 @@ export const PasswordRecoveryModal: React.FC = () => {
     }
     setIsSubmitting(true);
     try {
-      await updatePassword(password);
-      setDoneMessage('Your password has been updated. You are now signed in.');
+      await completePasswordReset(resetToken, password);
+      setDoneMessage('Your password has been updated. You can now log in with your new password.');
     } catch (err) {
       setErrorMessage(err instanceof Error && err.message ? err.message : 'Could not update password.');
     } finally {
@@ -117,7 +140,7 @@ export const PasswordRecoveryModal: React.FC = () => {
                     autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     className={inputClass}
                   />
                 </div>

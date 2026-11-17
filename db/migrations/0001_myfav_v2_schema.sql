@@ -1,7 +1,9 @@
 -- ============================================================================
 -- MyFav V2 — core schema, constraints, triggers and Row Level Security.
 --
--- Identity authority: auth.users (Supabase Auth).
+-- Identity authority: neon_auth."user" (Neon Managed Better Auth).
+-- auth.uid() is provided by Neon's pg_session_jwt (Data API) and returns the
+-- JWT `sub` as uuid; requests run as role `authenticated` or `anonymous`.
 -- IDs: client-compatible text IDs (same format as the original app:
 --      ^[A-Za-z0-9_-]{1,128}$), scoped per owner via composite primary keys
 --      (owner_id, id) so one user can never collide with / probe another
@@ -12,7 +14,7 @@
 
 create schema if not exists private;
 revoke all on schema private from public;
-grant usage on schema private to authenticated, anon;
+grant usage on schema private to authenticated, anonymous;
 
 -- ---------------------------------------------------------------------------
 -- Helper functions (private schema is NOT exposed through the Data API)
@@ -67,16 +69,27 @@ create or replace function private.is_verified()
 returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (
-    select 1 from auth.users u
-    where u.id = auth.uid() and u.email_confirmed_at is not null
+    select 1 from neon_auth."user" u
+    where u.id = auth.uid() and u."emailVerified" is true
   )
 $$;
 revoke all on function private.is_verified() from public;
 grant execute on function private.is_verified() to authenticated;
 
+-- Neon gives the API roles EXECUTE on auth.* but no USAGE on schema auth, so
+-- PL/pgSQL (which resolves names at run time) cannot call auth.uid() directly.
+-- This definer helper (owned by the migration role, which has USAGE) returns
+-- the caller's JWT subject; it reads only the current session's claims.
+create or replace function private.current_uid()
+returns uuid language sql stable security definer set search_path = '' as $$
+  select auth.uid()
+$$;
+revoke all on function private.current_uid() from public;
+grant execute on function private.current_uid() to authenticated;
+
 create or replace function private.require_uid()
 returns uuid language plpgsql stable set search_path = '' as $$
-declare v uuid := auth.uid();
+declare v uuid := private.current_uid();
 begin
   if v is null then
     raise exception 'Not authenticated' using errcode = '42501';
@@ -94,7 +107,7 @@ grant execute on all functions in schema private to authenticated;
 -- ---------------------------------------------------------------------------
 
 create table public.categories (
-  owner_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  owner_id    uuid not null default auth.uid() references neon_auth."user"(id) on delete cascade,
   id          text not null check (private.is_clean_id(id)),
   name        text not null check (char_length(name) between 1 and 80 and private.js_trim(name) <> ''),
   icon        text not null default 'bookmark' check (private.is_clean_icon(icon)),
@@ -109,7 +122,7 @@ create table public.categories (
 create index categories_owner_parent_idx on public.categories (owner_id, parent_id, sort_order);
 
 create table public.bookmarks (
-  owner_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  owner_id       uuid not null default auth.uid() references neon_auth."user"(id) on delete cascade,
   id             text not null check (private.is_clean_id(id)),
   title          text not null check (char_length(title) between 1 and 120),
   url            text not null check (char_length(url) <= 500 and private.is_http_url(url)),
@@ -130,7 +143,7 @@ create index bookmarks_owner_url_idx on public.bookmarks (owner_id, lower(url));
 create index bookmarks_owner_created_idx on public.bookmarks (owner_id, created_at, seq);
 
 create table public.quick_shortcuts (
-  owner_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  owner_id    uuid not null default auth.uid() references neon_auth."user"(id) on delete cascade,
   id          text not null check (private.is_clean_id(id)),
   title       text not null check (char_length(title) between 1 and 80),
   url         text not null check (char_length(url) <= 500 and private.is_http_url(url)),
@@ -146,7 +159,7 @@ create table public.quick_shortcuts (
 create index quick_shortcuts_owner_order_idx on public.quick_shortcuts (owner_id, sort_order, created_at);
 
 create table public.user_settings (
-  owner_id        uuid primary key default auth.uid() references auth.users(id) on delete cascade,
+  owner_id        uuid primary key default auth.uid() references neon_auth."user"(id) on delete cascade,
   theme_mode      text not null default 'dark' check (theme_mode in ('dark', 'light')),
   primary_color   text not null default 'blue' check (primary_color ~ '^[A-Za-z0-9#]{1,32}$'),
   glass_intensity text not null default 'balanced' check (glass_intensity in ('subtle', 'balanced', 'frosted')),
@@ -189,7 +202,7 @@ $$;
 
 create table public.shared_categories (
   id            text primary key check (private.is_clean_id(id)),
-  owner_id      uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  owner_id      uuid not null default auth.uid() references neon_auth."user"(id) on delete cascade,
   category_id   text not null check (private.is_clean_id(category_id)),
   category_name text not null check (char_length(category_name) between 1 and 80),
   category_icon text not null default 'bookmark' check (private.is_clean_icon(category_icon)),
@@ -393,7 +406,7 @@ begin
 end $$;
 
 revoke all on public.categories, public.bookmarks, public.quick_shortcuts,
-              public.user_settings, public.shared_categories from anon, public;
+              public.user_settings, public.shared_categories from anonymous, public;
 grant select, insert, update, delete on public.categories, public.bookmarks,
       public.quick_shortcuts, public.user_settings, public.shared_categories to authenticated;
 -- Note: seq columns are GENERATED ALWAYS identities; explicit writes are rejected by Postgres.

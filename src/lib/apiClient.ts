@@ -3,8 +3,8 @@
  *
  * Keeps the exact exported contract of the original `apiClient`
  * (src/lib/apiClient.ts in MyFav-main) so App.tsx and every component are
- * unchanged, but talks to Supabase (PostgREST + RLS + transactional RPCs)
- * instead of the original Express/Drizzle server.
+ * unchanged, but talks to the Neon Data API (PostgREST-compatible, RLS +
+ * transactional RPCs) instead of the original Express/Drizzle server.
  *
  * Original route              -> V2 implementation
  * GET    /api/workspace       -> 5 owner-scoped selects (paged, RLS)
@@ -28,7 +28,6 @@
  * DELETE /api/shares/:shareId -> delete shared_categories
  * GET    /api/shares/:shareId -> rpc get_public_share (anonymous, whitelisted)
  */
-import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type {
   BookmarkItem,
   CategoryItem,
@@ -37,7 +36,39 @@ import type {
   UserSettings,
 } from '../types';
 import type { ChromeImportPlan } from '../utils/chromeBookmarksParser';
-import { requireSupabase } from './supabaseClient';
+import { requireNeon } from './neonClient';
+
+/** Minimal structural types for the Data API client (Neon's postgrest-js). */
+interface PostgrestError {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+}
+type QueryResult<T> = PromiseLike<{ data: T | null; error: PostgrestError | null }>;
+interface QueryBuilder<T = unknown> extends QueryResult<T[]> {
+  select(columns?: string): QueryBuilder<T>;
+  eq(column: string, value: unknown): QueryBuilder<T>;
+  in(column: string, values: unknown[]): QueryBuilder<T>;
+  order(column: string, options?: { ascending?: boolean }): QueryBuilder<T>;
+  range(from: number, to: number): QueryBuilder<T>;
+  update(values: Record<string, unknown>): QueryBuilder<T>;
+  delete(): QueryBuilder<T>;
+  upsert(values: Record<string, unknown>, options?: { onConflict?: string }): QueryBuilder<T>;
+  maybeSingle(): QueryResult<T>;
+}
+export interface DataClient {
+  auth: {
+    getSession(): Promise<{
+      data: { session: { user?: { id?: string } | null } | null };
+      error: unknown;
+    }>;
+  };
+  // Rows are typed at each call site via selectAll<T>.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from(table: string): QueryBuilder<any>;
+  rpc(fn: string, args?: Record<string, unknown>): QueryResult<unknown>;
+}
 import {
   mapBookmark,
   mapCategory,
@@ -104,7 +135,7 @@ function fail(message: string, error: PostgrestError | Error | null | unknown): 
   throw new ApiError(message, error);
 }
 
-async function requireUserId(client: SupabaseClient): Promise<string> {
+async function requireUserId(client: DataClient): Promise<string> {
   const { data, error } = await client.auth.getSession();
   const uid = data.session?.user?.id;
   if (error || !uid) fail(MSG.auth, error);
@@ -126,7 +157,9 @@ async function selectAll<T>(
   return out;
 }
 
-export function createApiClient(getClient: () => SupabaseClient = requireSupabase) {
+export function createApiClient(
+  getClient: () => DataClient = () => requireNeon() as unknown as DataClient
+) {
   const loadWorkspace = async (): Promise<WorkspacePayload> => {
     const client = getClient();
     const uid = await requireUserId(client);

@@ -5,19 +5,21 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const forbiddenDeps = ['firebase', 'firebase-admin', 'express', 'drizzle-orm', 'drizzle-kit', '@google/genai', 'dotenv'];
+const forbiddenDeps = ['firebase', 'firebase-admin', 'express', 'drizzle-orm', 'drizzle-kit', '@google/genai', 'dotenv', '@supabase/supabase-js'];
 const problems = [];
 for (const d of forbiddenDeps) {
   if (pkg.dependencies?.[d]) problems.push(`runtime dependency "${d}" must not be present`);
 }
 if (pkg.dependencies?.pg) problems.push('runtime dependency "pg" must not be present (test-only devDependency is allowed)');
 
-const forbiddenImport = /from\s+['"](firebase(\/[^'"]*)?|firebase-admin(\/[^'"]*)?|express|drizzle-orm(\/[^'"]*)?|pg)['"]/;
+const forbiddenImport = /from\s+['"](firebase(\/[^'"]*)?|firebase-admin(\/[^'"]*)?|express|drizzle-orm(\/[^'"]*)?|pg|@supabase\/supabase-js)['"]/;
 const secretPatterns = [
   /sb_secret_[A-Za-z0-9_-]{10,}/,
   /service_role/i,
   /AIza[0-9A-Za-z_-]{30,}/,
   /-----BEGIN (RSA )?PRIVATE KEY-----/,
+  /npg_[A-Za-z0-9]{8,}/, // Neon role password
+  /postgres(ql)?:\/\/[^\s'"]+:[^\s'"@]+@/, // connection string with password
 ];
 
 function walk(dir) {
@@ -29,8 +31,8 @@ function walk(dir) {
       const rel = relative(root, p);
       if (forbiddenImport.test(text)) problems.push(`${rel}: imports a removed backend package`);
       for (const re of secretPatterns) {
-        // supabaseClient.ts legitimately mentions the words to *reject* them.
-        if (rel.endsWith('supabaseClient.ts')) continue;
+        // neonClient.ts legitimately mentions these patterns to *reject* them.
+        if (rel.endsWith('neonClient.ts')) continue;
         if (re.test(text)) problems.push(`${rel}: matches secret pattern ${re}`);
       }
     }
@@ -47,4 +49,4 @@ if (problems.length) {
   console.error('Forbidden-content check FAILED:\n - ' + problems.join('\n - '));
   process.exit(1);
 }
-console.log('Forbidden-content check passed (no Firebase/Express/Drizzle/pg runtime, no hard-coded secrets).');
+console.log('Forbidden-content check passed (no Firebase/Express/Drizzle/pg/Supabase runtime, no hard-coded secrets).');

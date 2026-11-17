@@ -90,7 +90,7 @@ async function v2Call(sql: string, params: unknown[] = []) {
 async function resetBoth() {
   await origPool.query(`delete from shared_categories; delete from quick_shortcuts; delete from bookmarks; delete from categories; delete from user_settings;`);
   await v2.query(`truncate public.shared_categories, public.bookmarks, public.quick_shortcuts, public.user_settings, public.categories cascade;
-                  delete from auth.users; insert into auth.users (id, email, email_confirmed_at) values ('${V2_UID}', 'a@example.com', now());`);
+                  delete from neon_auth."user"; insert into neon_auth."user" (id, email, "emailVerified") values ('${V2_UID}', 'a@example.com', true);`);
 }
 
 /** Same pre-existing cloud workspace in both systems, created via each system's own API. */
