@@ -23,7 +23,9 @@
 | 7 | Differential parity vs original server code | `tsx tests/parity/diff-original.ts` | **PASS 48/48** checks over 10 scenarios (incl. 5,000-bookmark imports) |
 | 8 | E2E guest flows, same spec on both builds | `npx playwright test` | **PASS 22/22** |
 | 9 | Visual parity | `node tests/visual/compare.mjs` | **PASS 42/42 pixel-identical** |
-| 10 | **Live Neon** database checks | Neon MCP (`docs/test-evidence/09-live-neon.md`) | **PASS** (20 checks; 1 defect found and fixed) |
+| 10 | **Live Neon** database checks, `v2-dev` | Neon MCP (`docs/test-evidence/09-live-neon.md`) | **PASS** (20 checks; 1 defect found and fixed) |
+| 10b | **Live Neon** database checks, `production` | Neon MCP, single rolled-back transaction (`docs/test-evidence/10-live-neon-production.md`) | **PASS 13/13**; branch left empty |
+| 10c | Real-user sign-up script (`npm run auth:smoke`) | exercised against a local mock of Neon Auth (sign-up → code → sign-in → get-session) | **PASS** (mock); a run against real Neon needs a machine that can reach Neon |
 | 11 | Mutation checks | manual | weakening RLS/constraints → 4 security tests fail. Breaking import dedupe → 5 parity checks fail. Removing the Neon `auth`-schema fix → 21 RPC tests fail. All restored |
 
 ## Defect found during the Neon migration
@@ -36,7 +38,7 @@
 | Visual capture of signed-in screens | needs the above |
 | Linked Chrome file (File System Access picker) | needs a real user gesture + OS picker |
 | Firefox / Safari / Figma Make | only Chromium available; Figma Make not tested |
-| `production` branch | intentionally untouched (needs your approval) |
+| Real sign-up against Neon (`npm run auth:smoke`) | network block here; run it locally |
 
 ## Notes
 - No functional defects are open in the tested scope.

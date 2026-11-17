@@ -23,35 +23,38 @@ Neon (project "MyFav", branch v2-dev)
 No server of your own is needed: deploy the static `dist/` folder.
 
 ## Current Neon setup (already done)
-| Item | Value |
-|---|---|
-| Project | `MyFav` (`raspy-butterfly-68832580`, AWS us-east-2, Postgres 18) |
-| Branch | `v2-dev` (`br-proud-breeze-becq3350`), created from `production`. **`production` is untouched and still empty.** |
-| Auth | Managed Better Auth: email/password with **required email verification (6-digit code)**, Google (Neon's shared dev credentials), sessions revoked on password reset, localhost allowed |
-| Data API | `https://ep-floral-violet-bewnf699.apirest.c-9.us-east-2.aws.neon.tech/neondb/rest/v1`, exposes `public` only, anon role `anonymous` |
-| Migrations | `0001` + `0002` applied; schema cache refreshed |
-| App URL value | `VITE_NEON_URL=https://ep-floral-violet-bewnf699.c-9.us-east-2.aws.neon.tech/neondb` |
-| Test users | `myfav.test.a@example.com`, `myfav.test.b@example.com` (no password; created for database checks) plus a little test data. Delete them in Neon Console → Auth → Users when you like. |
+| Item | `production` (`br-raspy-wind-be816ncw`) — **app default** | `v2-dev` (`br-proud-breeze-becq3350`) |
+|---|---|---|
+| Auth | Managed Better Auth: email/password, **required email verification (6-digit code)**, revoke sessions on password reset, Google (Neon shared dev credentials), localhost allowed | same |
+| Data API | `https://ep-icy-firefly-be63sv9l.apirest.c-9.us-east-2.aws.neon.tech/neondb/rest/v1` | `https://ep-floral-violet-bewnf699.apirest.c-9.us-east-2.aws.neon.tech/neondb/rest/v1` |
+| Migrations `0001` + `0002` | applied, cache refreshed | applied, cache refreshed |
+| Live checks | 13/13 (all rolled back; branch left empty) — `docs/test-evidence/10-live-neon-production.md` | 20 checks — `docs/test-evidence/09-live-neon.md` |
+| `VITE_NEON_URL` | `https://ep-icy-firefly-be63sv9l.c-9.us-east-2.aws.neon.tech/neondb` | `https://ep-floral-violet-bewnf699.c-9.us-east-2.aws.neon.tech/neondb` |
+| Data | empty (0 users) | 2 test users + sample rows (safe to delete) |
+
+Project `MyFav` (`raspy-butterfly-68832580`, AWS us-east-2, Postgres 18). `neon.ts` declares `auth: true`. `.env.local` (git-ignored) holds production's public URLs: `NEON_AUTH_BASE_URL`, `NEON_AUTH_JWKS_URL` and `VITE_NEON_URL`.
+
+### Prove sign-up with a real user
+```bash
+npm ci
+npm run auth:smoke -- you+myfav-test@yourmail.com   # enter the 6-digit code when asked
+```
+The script signs up a real user on the branch in `NEON_AUTH_BASE_URL`, verifies the code, signs in, and reads the current user back. It never prints the password, cookie or JWT.
 
 ## 1. Run locally against Neon
 ```bash
-cp .env.example .env.local     # VITE_NEON_URL is pre-filled for the v2-dev branch
+cp .env.example .env.local     # skip if .env.local already exists; points at production
 npm ci
-npm run dev                    # http://localhost:3000 (Neon Auth allows localhost on v2-dev)
+npm run dev                    # http://localhost:3000 (Neon Auth allows localhost on both branches)
 ```
 Without `VITE_NEON_URL` the app still runs in guest (local-only) mode and logs a configuration error.
 
-## 2. Going to production (later, with your approval)
-1. Apply `db/migrations/0001…` and `0002…` to the `production` branch, in order. Use the Neon SQL Editor, or `psql "$DATABASE_URL" -f …` from a machine that can reach Neon.
-2. Enable **Auth** and the **Data API** on `production` (Neon Console → Auth / Data API). Use Neon Auth as the provider.
-3. **Auth settings:**
-   - Require email verification, sending a code on sign-up and on sign-in.
-   - Revoke sessions on password reset.
-   - **Turn localhost off.**
-   - Add your production domain to **trusted domains**.
-4. **Google:** replace Neon's shared dev credentials with your own Google OAuth client (Neon Console → Auth → OAuth providers). Add the redirect URI that Neon shows there in Google Cloud Console.
-5. **Email:** for branded emails or verification *links*, configure a custom email provider. The shared sender (`auth@mail.myneon.app`) supports codes and password-reset links and is meant for development.
-6. Run the Data API advisors and refresh the schema cache.
+## 2. Before real users (production hardening)
+The database, Auth and Data API on `production` are ready. Before launch:
+1. **Turn localhost off** on `production` and add your real domain to Neon Auth **trusted domains** (`neon neon-auth domain add https://your.domain`).
+2. **Google:** replace Neon's shared dev credentials with your own Google OAuth client (Neon Console → Auth → OAuth providers).
+3. **Email:** configure a custom email provider (Resend/SMTP). The shared sender is meant for development; a custom one also allows verification *links*.
+4. Run the Data API advisors in the Neon Console.
 
 ## 3. Build & deploy
 ```bash
