@@ -164,7 +164,9 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
     });
   };
 
-  const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  // V2: include the deploy base path ("/" on root hosts, "/myfav-cloude/" on GitHub Pages).
+  const appOrigin =
+    typeof window !== 'undefined' ? `${window.location.origin}${import.meta.env.BASE_URL}` : '';
   const bookmarkletHref = generateBookmarkletHref(appOrigin);
 
   React.useEffect(() => {
