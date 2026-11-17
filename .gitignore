@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.env.local
+test-results/
+playwright-report/
+tests/e2e/results.json
+tests/visual/output/diff/

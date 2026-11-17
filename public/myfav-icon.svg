@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#070B14" />
+    </linearGradient>
+    <linearGradient id="ribbonGrad" x1="16" y1="10" x2="48" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="22" y1="16" x2="42" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#BAE6FD" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bgGrad)" stroke="#38BDF8" stroke-width="2" stroke-opacity="0.45" />
+  <path d="M20 14C20 11.7909 21.7909 10 24 10H40C42.2091 10 44 11.7909 44 14V51.5C44 53.1225 42.1782 54.0785 40.8419 53.1534L32 47.032L23.1581 53.1534C21.8218 54.0785 20 53.1225 20 51.5V14Z" fill="url(#ribbonGrad)" fill-opacity="0.92" />
+  <path d="M32 17.5L35.09 23.76L42 24.77L37 29.64L38.18 36.52L32 33.27L25.82 36.52L27 29.64L22 24.77L28.91 23.76L32 17.5Z" fill="url(#starGrad)" />
+</svg>

@@ -1,0 +1,320 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "A user-defined category or subcategory (when parentId is non-empty) for organizing saved websites.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the authenticated owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the category or subcategory.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "icon": {
+          "type": "string",
+          "description": "Lucide icon identifier for the category.",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "Empty string for root categories, or parent category ID for subcategories.",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^([a-zA-Z0-9_\\-]+)?$"
+        },
+        "order": {
+          "type": "number",
+          "description": "Numeric sort order of the category."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the category was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the category was last updated."
+        }
+      },
+      "required": ["ownerId", "name", "icon", "parentId", "order", "createdAt", "updatedAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "A saved website entry assigned to a category and optional subcategory.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the authenticated owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the saved website.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "url": {
+          "type": "string",
+          "description": "Full HTTP/HTTPS URL of the saved website.",
+          "minLength": 4,
+          "maxLength": 500,
+          "pattern": "^https?://.+$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Notes or summary about why this website was saved.",
+          "minLength": 0,
+          "maxLength": 400
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "ID of the root category this website belongs to.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "subcategoryId": {
+          "type": "string",
+          "description": "ID of the subcategory, or empty string if assigned only to the root category.",
+          "minLength": 0,
+          "maxLength": 128,
+          "pattern": "^([a-zA-Z0-9_\\-]+)?$"
+        },
+        "isFavorite": {
+          "type": "boolean",
+          "description": "Whether the website is pinned to favorites."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the bookmark was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the bookmark was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "url",
+        "description",
+        "categoryId",
+        "subcategoryId",
+        "isFavorite",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Per-user visual customization preferences including primary theme accent color and glass intensity.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the authenticated user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "primaryColor": {
+          "type": "string",
+          "description": "Selected theme accent key or hex color.",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9#_\\-]+$"
+        },
+        "glassIntensity": {
+          "type": "string",
+          "description": "Backdrop blur and translucency preset.",
+          "enum": ["subtle", "balanced", "frosted"],
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "cardDensity": {
+          "type": "string",
+          "description": "Layout density preference.",
+          "enum": ["comfortable", "compact"],
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when settings were last updated."
+        }
+      },
+      "required": ["ownerId", "primaryColor", "glassIntensity", "cardDensity", "updatedAt"]
+    },
+    "QuickShortcut": {
+      "title": "QuickShortcut",
+      "description": "A user-selected quick access website shortcut displayed at the top of the workspace with a customizable icon.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the authenticated owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display name of the quick access website.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "url": {
+          "type": "string",
+          "description": "Full HTTP/HTTPS URL of the quick access website.",
+          "minLength": 4,
+          "maxLength": 500,
+          "pattern": "^https?://.+$"
+        },
+        "iconType": {
+          "type": "string",
+          "description": "How the shortcut icon is rendered: website favicon, vector icon, or custom image URL.",
+          "enum": ["favicon", "lucide", "custom"],
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "customIcon": {
+          "type": "string",
+          "description": "Empty string for favicon, Lucide icon identifier for lucide, or HTTPS image URL for custom.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "order": {
+          "type": "number",
+          "description": "Numeric sort order of the shortcut."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the shortcut was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the shortcut was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "url",
+        "iconType",
+        "customIcon",
+        "order",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SharedCategory": {
+      "title": "SharedCategory",
+      "description": "A public, read-only snapshot of a curated category collection (subcategories and bookmarks) shared via a unique link.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the authenticated owner who published the share.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Original root category ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryName": {
+          "type": "string",
+          "description": "Display name of the shared category.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "categoryIcon": {
+          "type": "string",
+          "description": "Lucide icon identifier for the shared category.",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the shared collection is publicly accessible via its share link."
+        },
+        "subcategories": {
+          "type": "array",
+          "description": "Bounded list of subcategories inside the shared category (max 100)."
+        },
+        "bookmarks": {
+          "type": "array",
+          "description": "Bounded list of curated bookmarks inside the shared category (max 500)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the share link was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the shared snapshot was last refreshed."
+        }
+      },
+      "required": [
+        "ownerId",
+        "categoryId",
+        "categoryName",
+        "categoryIcon",
+        "isPublic",
+        "subcategories",
+        "bookmarks",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Stores root categories and subcategories owned by individual users."
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": { "$ref": "#/entities/Bookmark" },
+      "description": "Stores saved website bookmarks linked to user categories."
+    },
+    "/userSettings/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "Stores theme color and glassmorphic UI preferences per user."
+    },
+    "/quickShortcuts/{shortcutId}": {
+      "schema": { "$ref": "#/entities/QuickShortcut" },
+      "description": "Stores top bar quick access website shortcuts with customizable icons."
+    },
+    "/sharedCategories/{shareId}": {
+      "schema": { "$ref": "#/entities/SharedCategory" },
+      "description": "Stores public, read-only snapshots of curated category collections accessible by direct shareId."
+    }
+  }
+}
+

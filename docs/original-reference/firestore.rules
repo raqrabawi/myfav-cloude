@@ -1,0 +1,337 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidOptionalId(id) {
+      return id is string && id.size() >= 0 && id.size() <= 128 && id.matches('^([a-zA-Z0-9_\\-]+)?$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Pillar 2: Validation Blueprints (Anti-Update-Gap)
+    function isValidCategory(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'icon', 'parentId', 'order', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'icon', 'parentId', 'order', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.icon is string && data.icon.size() >= 1 && data.icon.size() <= 40 && data.icon.matches('^[a-zA-Z0-9_\\-]+$')
+        && isValidOptionalId(data.parentId)
+        && data.order is number && data.order >= 0 && data.order <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidParentCategoryLink(parentId) {
+      return parentId == '' || (
+        exists(/databases/$(database)/documents/categories/$(parentId))
+        && get(/databases/$(database)/documents/categories/$(parentId)).data.ownerId == request.auth.uid
+      );
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll(['ownerId', 'title', 'url', 'description', 'categoryId', 'subcategoryId', 'isFavorite', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'title', 'url', 'description', 'categoryId', 'subcategoryId', 'isFavorite', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.url is string && data.url.size() >= 4 && data.url.size() <= 500 && data.url.matches('^https?://.+$')
+        && data.description is string && data.description.size() >= 0 && data.description.size() <= 400
+        && isValidId(data.categoryId)
+        && isValidOptionalId(data.subcategoryId)
+        && data.isFavorite is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBookmarkCategoryRefs(categoryId, subcategoryId) {
+      return existsAfter(/databases/$(database)/documents/categories/$(categoryId))
+        && getAfter(/databases/$(database)/documents/categories/$(categoryId)).data.ownerId == request.auth.uid
+        && (
+          subcategoryId == '' || (
+            existsAfter(/databases/$(database)/documents/categories/$(subcategoryId))
+            && getAfter(/databases/$(database)/documents/categories/$(subcategoryId)).data.ownerId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/categories/$(subcategoryId)).data.parentId == categoryId
+          )
+        );
+    }
+
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['ownerId', 'primaryColor', 'glassIntensity', 'cardDensity', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'primaryColor', 'glassIntensity', 'cardDensity', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.primaryColor is string && data.primaryColor.size() >= 3 && data.primaryColor.size() <= 32 && data.primaryColor.matches('^[a-zA-Z0-9#_\\-]+$')
+        && data.glassIntensity is string && data.glassIntensity.size() >= 1 && data.glassIntensity.size() <= 20 && data.glassIntensity in ['subtle', 'balanced', 'frosted']
+        && data.cardDensity is string && data.cardDensity.size() >= 1 && data.cardDensity.size() <= 20 && data.cardDensity in ['comfortable', 'compact']
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQuickShortcut(data) {
+      return data.keys().hasAll(['ownerId', 'title', 'url', 'iconType', 'customIcon', 'order', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'title', 'url', 'iconType', 'customIcon', 'order', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 80
+        && data.url is string && data.url.size() >= 4 && data.url.size() <= 500 && data.url.matches('^https?://.+$')
+        && data.iconType is string && data.iconType.size() >= 1 && data.iconType.size() <= 20 && data.iconType in ['favicon', 'lucide', 'custom']
+        && data.customIcon is string && data.customIcon.size() >= 0 && data.customIcon.size() <= 500
+        && (
+          (data.iconType == 'favicon' && data.customIcon == '') ||
+          (data.iconType == 'lucide' && data.customIcon.size() >= 1 && data.customIcon.size() <= 40 && data.customIcon.matches('^[a-zA-Z0-9_\\-]+$')) ||
+          (data.iconType == 'custom' && data.customIcon.size() >= 4 && data.customIcon.size() <= 500 && data.customIcon.matches('^https?://.+$'))
+        )
+        && data.order is number && data.order >= 0 && data.order <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSharedCategory(data) {
+      return data.keys().hasAll(['ownerId', 'categoryId', 'categoryName', 'categoryIcon', 'isPublic', 'subcategories', 'bookmarks', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'categoryId', 'categoryName', 'categoryIcon', 'isPublic', 'subcategories', 'bookmarks', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && isValidId(data.categoryId)
+        && data.categoryName is string && data.categoryName.size() >= 1 && data.categoryName.size() <= 80
+        && data.categoryIcon is string && data.categoryIcon.size() >= 1 && data.categoryIcon.size() <= 40 && data.categoryIcon.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.isPublic is bool
+        && data.subcategories is list && data.subcategories.size() <= 100
+        && (
+          data.subcategories.size() == 0 || (
+            data.subcategories[0] is map
+            && data.subcategories[0].keys().hasAll(['id', 'name', 'icon', 'order'])
+            && data.subcategories[0].keys().hasOnly(['id', 'name', 'icon', 'order'])
+            && isValidId(data.subcategories[0].id)
+            && data.subcategories[0].name is string && data.subcategories[0].name.size() >= 1 && data.subcategories[0].name.size() <= 80
+            && data.subcategories[0].icon is string && data.subcategories[0].icon.size() >= 1 && data.subcategories[0].icon.size() <= 40 && data.subcategories[0].icon.matches('^[a-zA-Z0-9_\\-]+$')
+            && data.subcategories[0].order is number
+          )
+        )
+        && data.bookmarks is list && data.bookmarks.size() <= 500
+        && (
+          data.bookmarks.size() == 0 || (
+            data.bookmarks[0] is map
+            && data.bookmarks[0].keys().hasAll(['title', 'url', 'description', 'subcategoryId', 'isFavorite'])
+            && data.bookmarks[0].keys().hasOnly(['title', 'url', 'description', 'subcategoryId', 'isFavorite'])
+            && data.bookmarks[0].title is string && data.bookmarks[0].title.size() >= 1 && data.bookmarks[0].title.size() <= 120
+            && data.bookmarks[0].url is string && data.bookmarks[0].url.size() >= 4 && data.bookmarks[0].url.size() <= 500 && data.bookmarks[0].url.matches('^https?://.+$')
+            && data.bookmarks[0].description is string && data.bookmarks[0].description.size() >= 0 && data.bookmarks[0].description.size() <= 400
+            && isValidOptionalId(data.bookmarks[0].subcategoryId)
+            && data.bookmarks[0].isFavorite is bool
+          )
+        )
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSharedCategoryRef(categoryId) {
+      return exists(/databases/$(database)/documents/categories/$(categoryId))
+        && get(/databases/$(database)/documents/categories/$(categoryId)).data.ownerId == request.auth.uid
+        && get(/databases/$(database)/documents/categories/$(categoryId)).data.parentId == '';
+    }
+
+    // Collection 1: Categories & Subcategories
+    match /categories/{categoryId} {
+      allow get: if isVerifiedUser() && isValidId(categoryId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser()
+        && isValidId(categoryId)
+        && isValidCategory(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isValidParentCategoryLink(incoming().parentId);
+
+      allow update: if isValidCategory(incoming())
+        && isVerifiedUser()
+        && isValidId(categoryId)
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Rename or update icon/order
+          (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'order', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'icon', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['order', 'updatedAt'])) ||
+          // Action 2: Reparent & reorder category/subcategory
+          (incoming().diff(existing()).affectedKeys().hasOnly(['parentId', 'updatedAt']) && isValidParentCategoryLink(incoming().parentId)) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['parentId', 'order', 'updatedAt']) && isValidParentCategoryLink(incoming().parentId))
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(categoryId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 2: Saved Website Bookmarks
+    match /bookmarks/{bookmarkId} {
+      allow get: if isVerifiedUser() && isValidId(bookmarkId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser()
+        && isValidId(bookmarkId)
+        && isValidBookmark(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isValidBookmarkCategoryRefs(incoming().categoryId, incoming().subcategoryId);
+
+      allow update: if isValidBookmark(incoming())
+        && isVerifiedUser()
+        && isValidId(bookmarkId)
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Move website to another category or subcategory
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['categoryId', 'subcategoryId', 'updatedAt'])
+            && isValidBookmarkCategoryRefs(incoming().categoryId, incoming().subcategoryId)
+          ) ||
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['subcategoryId', 'updatedAt'])
+            && isValidBookmarkCategoryRefs(incoming().categoryId, incoming().subcategoryId)
+          ) ||
+          // Action 2: Toggle Favorite status
+          (incoming().diff(existing()).affectedKeys().hasOnly(['isFavorite', 'updatedAt'])) ||
+          // Action 3: Batch Edit (Category/Subcategory + Favorite status together)
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['categoryId', 'subcategoryId', 'isFavorite', 'updatedAt'])
+            && isValidBookmarkCategoryRefs(incoming().categoryId, incoming().subcategoryId)
+          ) ||
+          // Action 4: Edit website metadata (title, url, description, category, subcategory, favorite)
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'description', 'categoryId', 'subcategoryId', 'isFavorite', 'updatedAt'])
+            && isValidBookmarkCategoryRefs(incoming().categoryId, incoming().subcategoryId)
+          ) ||
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'description', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(bookmarkId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 3: User Theme & Glass Settings
+    match /userSettings/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && (resource == null || existing().ownerId == request.auth.uid);
+      allow list: if false;
+
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && isValidUserSettings(incoming())
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidUserSettings(incoming())
+        && isVerifiedUser()
+        && isValidId(userId)
+        && userId == request.auth.uid
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Update primary color
+          (incoming().diff(existing()).affectedKeys().hasOnly(['primaryColor', 'updatedAt'])) ||
+          // Action 2: Update glass intensity
+          (incoming().diff(existing()).affectedKeys().hasOnly(['glassIntensity', 'updatedAt'])) ||
+          // Action 3: Update card density
+          (incoming().diff(existing()).affectedKeys().hasOnly(['cardDensity', 'updatedAt'])) ||
+          // Action 4: Full settings sync
+          (incoming().diff(existing()).affectedKeys().hasOnly(['primaryColor', 'glassIntensity', 'cardDensity', 'updatedAt']))
+        );
+
+      allow delete: if false;
+    }
+
+    // Collection 4: Quick Access Website Shortcuts
+    match /quickShortcuts/{shortcutId} {
+      allow get: if isVerifiedUser() && isValidId(shortcutId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser()
+        && isValidId(shortcutId)
+        && isValidQuickShortcut(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidQuickShortcut(incoming())
+        && isVerifiedUser()
+        && isValidId(shortcutId)
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Edit shortcut name, URL, or icon
+          (incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'iconType', 'customIcon', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['iconType', 'customIcon', 'updatedAt'])) ||
+          // Action 2: Reorder shortcut
+          (incoming().diff(existing()).affectedKeys().hasOnly(['order', 'updatedAt']))
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(shortcutId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection 5: Public Read-Only Shared Category Snapshots
+    match /sharedCategories/{shareId} {
+      allow get: if isValidId(shareId) && (
+        resource == null ||
+        existing().isPublic == true ||
+        (isVerifiedUser() && existing().ownerId == request.auth.uid)
+      );
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser()
+        && isValidId(shareId)
+        && isValidSharedCategory(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isValidSharedCategoryRef(incoming().categoryId);
+
+      allow update: if isValidSharedCategory(incoming())
+        && isVerifiedUser()
+        && isValidId(shareId)
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().categoryId == existing().categoryId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isValidSharedCategoryRef(incoming().categoryId)
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'categoryName',
+          'categoryIcon',
+          'isPublic',
+          'subcategories',
+          'bookmarks',
+          'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedUser() && isValidId(shareId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,370 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --accent-primary: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-light: #93c5fd;
+    --accent-rgb: 59, 130, 246;
+    --glass-bg: rgba(15, 23, 42, 0.62);
+    --glass-bg-elevated: rgba(19, 29, 51, 0.78);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: 16px;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #070b14;
+    color: #f1f5f9;
+    letter-spacing: 0.01em;
+    overflow-x: hidden;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  html.light body {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Bricolage Grotesque', sans-serif;
+  }
+
+  .font-mono-tabular {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+html.light .glass-surface {
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+}
+
+.glass-elevated {
+  background: var(--glass-bg-elevated);
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.25));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.25));
+  border: 1px solid var(--glass-border);
+}
+
+html.light .glass-elevated {
+  box-shadow: 0 4px 24px -4px rgba(15, 23, 42, 0.07);
+}
+
+.website-card {
+  box-shadow: 0 2px 10px -3px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+
+.website-card:hover {
+  transform: scale(1.01);
+  box-shadow:
+    0 14px 30px -8px rgba(0, 0, 0, 0.52),
+    0 4px 12px -2px rgba(var(--accent-rgb), 0.14);
+}
+
+html.light .website-card {
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05);
+}
+
+html.light .website-card:hover {
+  transform: scale(1.01);
+  box-shadow:
+    0 14px 28px -6px rgba(15, 23, 42, 0.13),
+    0 4px 12px -2px rgba(var(--accent-rgb), 0.12);
+}
+
+.accent-bg {
+  background-color: var(--accent-primary);
+}
+
+.accent-bg:hover {
+  background-color: var(--accent-hover);
+}
+
+.accent-text {
+  color: var(--accent-light);
+}
+
+html.light .accent-text {
+  color: var(--accent-primary);
+}
+
+.accent-border {
+  border-color: rgba(var(--accent-rgb), 0.45);
+}
+
+.accent-ring:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.accent-subtle-bg {
+  background-color: rgba(var(--accent-rgb), 0.14);
+}
+
+html.light .accent-subtle-bg {
+  background-color: rgba(var(--accent-rgb), 0.11);
+}
+
+.chrome-sync-btn {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 180ms ease;
+}
+
+.chrome-sync-btn:not(:disabled):hover {
+  transform: translateY(-1px) scale(1.01);
+  background-color: rgba(var(--accent-rgb), 0.24);
+  border-color: rgba(var(--accent-rgb), 0.78);
+  box-shadow:
+    0 10px 22px -6px rgba(var(--accent-rgb), 0.32),
+    0 0 0 1px rgba(var(--accent-rgb), 0.2);
+}
+
+.chrome-sync-btn:not(:disabled):active {
+  transform: translateY(0) scale(0.99);
+}
+
+html.light .chrome-sync-btn:not(:disabled):hover {
+  background-color: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.72);
+  box-shadow:
+    0 10px 20px -6px rgba(var(--accent-rgb), 0.22),
+    0 0 0 1px rgba(var(--accent-rgb), 0.18);
+}
+
+.accent-glow-bg {
+  background-color: #070b14;
+  background-image: radial-gradient(
+      650px circle at 18% 12%,
+      rgba(var(--accent-rgb), 0.16),
+      transparent 65%
+    ),
+    radial-gradient(
+      550px circle at 85% 82%,
+      rgba(var(--accent-rgb), 0.1),
+      transparent 65%
+    );
+}
+
+html.light .accent-glow-bg {
+  background-color: #f1f5f9;
+  background-image: radial-gradient(
+      650px circle at 18% 12%,
+      rgba(var(--accent-rgb), 0.12),
+      transparent 65%
+    ),
+    radial-gradient(
+      550px circle at 85% 82%,
+      rgba(var(--accent-rgb), 0.08),
+      transparent 65%
+    );
+}
+
+/* Light Mode Adaptive Overrides for Dark Utility Classes */
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0f172a;
+}
+
+html.light .text-slate-300 {
+  color: #334155;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #64748b;
+}
+
+html.light .text-slate-600 {
+  color: #94a3b8;
+}
+
+html.light .hover\:text-white:hover,
+html.light .hover\:text-slate-100:hover,
+html.light .hover\:text-slate-200:hover,
+html.light .hover\:text-slate-300:hover {
+  color: #0f172a;
+}
+
+html.light .group:hover .group-hover\:text-slate-200 {
+  color: #0f172a;
+}
+
+/* High-contrast text selection (::selection) for Dark & Light Mode */
+::selection {
+  background-color: rgba(var(--accent-rgb), 0.35);
+  color: #ffffff;
+}
+
+html.light ::selection {
+  background-color: rgba(var(--accent-rgb), 0.22);
+  color: #0f172a;
+}
+
+/* Ensure solid accent buttons always keep crisp white text in Light Mode */
+html.light .accent-bg,
+html.light .accent-bg *,
+html.light .accent-bg.text-white,
+html.light .accent-bg .text-white,
+html.light .accent-bg:hover,
+html.light .accent-bg:hover * {
+  color: #ffffff;
+}
+
+/* Selected subtle accent surfaces in Light Mode */
+html.light .accent-subtle-bg {
+  background-color: rgba(var(--accent-rgb), 0.12);
+}
+
+html.light .accent-subtle-bg.text-white,
+html.light .accent-subtle-bg .text-white {
+  color: #0f172a;
+}
+
+html.light .accent-border {
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+
+html.light nav .border-b-2.text-white {
+  color: #0f172a;
+}
+
+/* Unselected item surfaces, inputs, and nested cards in Light Mode */
+html.light .bg-slate-950,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/45,
+html.light .bg-slate-950\/50,
+html.light .bg-slate-950\/55,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-900,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/90 {
+  background-color: #f8fafc;
+}
+
+html.light .hover\:bg-slate-950\/80:hover {
+  background-color: #f1f5f9;
+}
+
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/40,
+html.light .bg-slate-700\/80 {
+  background-color: #e2e8f0;
+}
+
+html.light .bg-white\/5,
+html.light .bg-white\/8 {
+  background-color: #f1f5f9;
+}
+
+html.light .hover\:bg-white\/\[0\.03\]:hover,
+html.light .hover\:bg-white\/5:hover {
+  background-color: #f1f5f9;
+}
+
+html.light .hover\:bg-white\/10:hover,
+html.light .hover\:bg-white\/15:hover {
+  background-color: #e2e8f0;
+}
+
+/* Crisp borders for unselected items, inputs, and dividers in Light Mode */
+html.light .border-white\/5,
+html.light .border-white\/6,
+html.light .border-white\/8,
+html.light .border-white\/10,
+html.light .border-white\/15,
+html.light .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+html.light .divide-white\/8 > :not(:last-child) {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+html.light .hover\:border-white\/20:hover,
+html.light .hover\:border-white\/25:hover {
+  border-color: rgba(15, 23, 42, 0.24);
+}
+
+/* Semantic Status Colors (Rose & Amber) in Light Mode for High Contrast */
+html.light .text-rose-200,
+html.light .text-rose-300 {
+  color: #be123c;
+}
+
+html.light .bg-rose-950\/40 {
+  background-color: rgba(255, 241, 242, 0.9);
+}
+
+html.light .text-amber-300 {
+  color: #b45309;
+}
+
+html.light .text-emerald-300,
+html.light .text-emerald-400 {
+  color: #059669;
+}
+
+/* Modal Backdrop in Light Mode */
+html.light .bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+/* Custom subtle scrollbar that respects rounded corners */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+html.light ::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.28);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--accent-rgb), 0.55);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
