@@ -318,6 +318,12 @@ html.light .hover\:bg-slate-800:hover {
   background-color: #e2e8f0;
 }
 
+/* Collapsed sidebar: the selected item's count badge (bg-slate-950 + text-white)
+   turns light in Light Mode, so its number needs dark text to stay visible. */
+html.light .bg-slate-950.text-white {
+  color: #0f172a;
+}
+
 /* Crisp borders for unselected items, inputs, and dividers in Light Mode */
 html.light .border-white\/5,
 html.light .border-white\/6,
