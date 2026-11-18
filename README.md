@@ -2,6 +2,8 @@
 
 **Live:** https://myfav.aqrabawi.com (main) · https://raqrabawi.github.io/myfav-cloude/ (auto-deployed from `main`)
 
+**Use it as an app:** on iPhone/iPad open the site in Safari → Share → *Add to Home Screen*; on Android, Chrome or Edge use *Install*; on a Mac use Safari → File → *Add to Dock*.
+
 A rebuild of **MyFav — Personal Web Curator** on **Neon**. The user interface is the original MyFav UI, unchanged (verified pixel-identical; see `VISUAL_PARITY.md`). Underneath, Firebase Auth, the Express API, Drizzle and the self-managed PostgreSQL server are replaced by **Neon Managed Better Auth + Neon Data API + Postgres Row Level Security + transactional RPCs**.
 
 > The original MyFav repository, Firebase project and database are **not touched** by this project.

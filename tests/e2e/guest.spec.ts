@@ -95,7 +95,7 @@ test('add quick shortcut', async ({ page }) => {
 test('Chrome bookmarks HTML import (guest, merge) builds categories and skips duplicates', async ({ page }) => {
   await open(page, { seed: false });
   await page.getByRole('button', { name: /^Settings$/ }).first().click();
-  await page.getByRole('button', { name: /Chrome Sync/ }).first().click();
+  await page.getByRole('button', { name: /Import & Sync/ }).first().click();
   const html = readFileSync(join(import.meta.dirname, '../fixtures/chrome-basic.html'), 'utf8');
   await page.locator('input[type="file"]').first().setInputFiles({ name: 'bookmarks.html', mimeType: 'text/html', buffer: Buffer.from(html) });
   await expect.poll(async () => ((await stored(page, KEYS.bms)) || []).length, { timeout: 20_000 }).toBeGreaterThan(5);
@@ -132,4 +132,86 @@ test('unknown share link shows not-found state and back returns to directory', a
   await open(page);
   await page.goto('/?share=share_unknown');
   await expect(page.getByText(/not found|unavailable|no longer/i).first()).toBeVisible({ timeout: 15_000 });
+});
+
+test('Safari bookmarks export imports: Favorites kept, folders become categories, Reading List skipped', async ({ page }) => {
+  await open(page, { seed: false });
+  await page.getByRole('button', { name: /^Settings$/ }).first().click();
+  await page.getByRole('button', { name: /Import & Sync/ }).first().click();
+  const html = readFileSync(join(import.meta.dirname, '../fixtures/safari-export.html'), 'utf8');
+  await page.locator('input[type="file"]').first().setInputFiles({ name: 'Safari Bookmarks.html', mimeType: 'text/html', buffer: Buffer.from(html) });
+  await expect.poll(async () => ((await stored(page, KEYS.bms)) || []).length, { timeout: 20_000 }).toBe(8);
+  const names = ((await stored(page, KEYS.cats)) as { name: string }[]).map((c) => c.name);
+  expect(names).toEqual(expect.arrayContaining(['Favorites', 'Design', 'Bookmarks Menu', 'Work', 'Docs']));
+  expect(names).not.toContain('Reading List');
+});
+
+test.describe('install MyFav as an app', () => {
+  test.describe('iPhone Safari', () => {
+    test.use({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1',
+    });
+
+    test('shows the Share → Add to Home Screen steps, and "Got it" hides it', async ({ page }) => {
+      await open(page);
+      const card = page.getByTestId('install-app-prompt');
+      await expect(card).toBeVisible({ timeout: 10_000 });
+      await expect(card).toContainText('Add to Home Screen');
+      await card.getByRole('button', { name: 'Got it' }).click();
+      await expect(card).toBeHidden();
+      await page.reload();
+      await page.waitForTimeout(7000);
+      await expect(page.getByTestId('install-app-prompt')).toHaveCount(0); // remembered for 30 days
+    });
+
+    test('is not shown when MyFav is already installed (opened from the Home Screen)', async ({ page }) => {
+      await page.addInitScript(() => Object.defineProperty(window.navigator, 'standalone', { get: () => true }));
+      await open(page);
+      await page.waitForTimeout(7000);
+      await expect(page.getByTestId('install-app-prompt')).toHaveCount(0);
+    });
+  });
+
+  test('Chrome / Edge: one-tap Install uses the browser install prompt; Settings offers it too', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const ev = new Event('beforeinstallprompt', { cancelable: true }) as Event & Record<string, unknown>;
+          ev.prompt = async () => {
+            (window as unknown as { __prompted: boolean }).__prompted = true;
+          };
+          ev.userChoice = Promise.resolve({ outcome: 'accepted' });
+          window.dispatchEvent(ev);
+        }, 200);
+      });
+    });
+    await open(page);
+    const card = page.getByTestId('install-app-prompt');
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: /^Settings$/ }).first().click();
+    await page.getByRole('button', { name: /^Account/ }).first().click();
+    const section = page.getByTestId('install-app-section');
+    await expect(section.getByRole('button', { name: 'Install MyFav' })).toBeVisible();
+    await card.getByRole('button', { name: 'Install' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __prompted?: boolean }).__prompted)).toBe(true);
+    await expect(card).toBeHidden();
+  });
+
+  test('manifest and home-screen icon are served', async ({ page, request }) => {
+    await open(page);
+    const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+    const manifest = await (await request.get(new URL(href!, page.url()).toString())).json();
+    expect(manifest.short_name).toBe('MyFav');
+    expect(manifest.display).toBe('standalone');
+    for (const icon of manifest.icons) {
+      const res = await request.get(new URL(icon.src, new URL(href!, page.url())).toString());
+      expect(res.status(), icon.src).toBe(200);
+    }
+    const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
+    expect((await request.get(new URL(touch!, page.url()).toString())).status()).toBe(200);
+  });
 });
