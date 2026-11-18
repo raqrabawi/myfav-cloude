@@ -22,6 +22,8 @@ jobs:
       PGUSER: postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: the Figma update package diffs against the figma-live branch
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,6 +35,20 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Figma Make packages (browser-only check + changes since figma-live)
+        run: npm run package:figma -- --since figma-live
+      - name: Upload Figma Make update (changed files only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: myfav-figma-update
+          path: dist-figma/myfav-figma-update/
+          retention-days: 30
+      - name: Upload Figma Make full package
+        uses: actions/upload-artifact@v4
+        with:
+          name: myfav-figma-make
+          path: dist-figma/myfav-figma-make/
+          retention-days: 30
       - name: Apply local Neon-equivalent shim + migrations
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
