@@ -8,11 +8,11 @@
 // replaces, but never deletes, so the package also ships a DELETE list.
 // See docs/FIGMA_MAKE.md.
 //
-// Update mode:  npm run package:figma -- --since <git ref>   (default ref: figma-live tag)
+// Update mode:  npm run package:figma -- --since <git ref>   (default ref: figma-live branch)
 //   Also writes dist-figma/myfav-figma-update/ (+ .zip) with ONLY the app files
 //   that changed since <ref>, and a DELETE list of app files removed since then.
-//   The `figma-live` git tag marks the version currently in Figma Make; move it
-//   after each confirmed publish:  git tag -f figma-live <commit> && git push -f origin figma-live
+//   The `figma-live` BRANCH marks the version currently in Figma Make; move it
+//   after each confirmed publish:  git push origin <commit>:refs/heads/figma-live
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -183,10 +183,16 @@ if (wantUpdate) {
   const since = (sinceIdx !== -1 && process.argv[sinceIdx + 1]) || 'figma-live';
   const git = (...args) => execFileSync('git', args, { cwd: root }).toString().trim();
   let fromCommit;
-  try {
-    fromCommit = git('rev-parse', '--short', `${since}^{commit}`);
-  } catch {
-    console.error(`Update package: unknown ref "${since}". Fetch tags (git fetch --tags) or pass --since <commit>.`);
+  for (const ref of [`origin/${since}`, since]) {
+    try {
+      fromCommit = git('rev-parse', '--short', `${ref}^{commit}`);
+      break;
+    } catch {
+      // try the next spelling
+    }
+  }
+  if (!fromCommit) {
+    console.error(`Update package: unknown ref "${since}". Run git fetch origin ${since}, or pass --since <commit>.`);
     process.exit(1);
   }
   const scope = [...ROOT_FILES, ...ROOT_DIRS];
