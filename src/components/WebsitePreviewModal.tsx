@@ -19,6 +19,8 @@ interface WebsitePreviewModalProps {
   category?: CategoryItem | null;
   subcategory?: CategoryItem | null;
   onClose: () => void;
+  /** Called when the user opens the website from the preview (usage counting). */
+  onVisit?: (bookmark: BookmarkItem) => void;
 }
 
 export const WebsitePreviewModal: React.FC<WebsitePreviewModalProps> = ({
@@ -26,6 +28,7 @@ export const WebsitePreviewModal: React.FC<WebsitePreviewModalProps> = ({
   category,
   subcategory,
   onClose,
+  onVisit,
 }) => {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeKey, setIframeKey] = useState(0);
@@ -343,6 +346,8 @@ export const WebsitePreviewModal: React.FC<WebsitePreviewModalProps> = ({
               href={resolvedUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => bookmark && onVisit?.(bookmark)}
+              onAuxClick={(e) => e.button === 1 && bookmark && onVisit?.(bookmark)}
               className="min-h-[38px] px-4 py-1.5 rounded-xl accent-bg text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md"
             >
               <span>Open Website</span>

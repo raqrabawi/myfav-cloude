@@ -99,6 +99,7 @@ const MSG = {
   sync: 'Failed to sync local data',
   clear: 'Failed to clear workspace',
   importPlan: 'Failed to import bookmarks',
+  recordOpen: 'Failed to record website usage',
   saveBookmark: 'Failed to save website',
   favorite: 'Failed to toggle favorite',
   deleteBookmark: 'Failed to delete website',
@@ -181,7 +182,7 @@ export function createApiClient(
           client
             .from('bookmarks')
             .select(
-              'owner_id,id,title,url,description,category_id,subcategory_id,is_favorite,created_at,updated_at'
+              'owner_id,id,title,url,description,category_id,subcategory_id,is_favorite,created_at,updated_at,open_count,last_opened_at'
             )
             .eq('owner_id', uid)
             .order('created_at', { ascending: true })
@@ -292,6 +293,12 @@ export function createApiClient(
     }): Promise<BookmarkItem> => {
       const row = await rpc<BookmarkRow>('myfav_save_bookmark', { p: data }, MSG.saveBookmark);
       return mapBookmark(row);
+    },
+
+    /** Counts one open of a website (Main Page "most used" order). */
+    recordBookmarkOpen: async (id: string) => {
+      await rpc('myfav_record_bookmark_open', { p_id: id }, MSG.recordOpen);
+      return { ok: true };
     },
 
     toggleFavorite: async (id: string, isFavorite: boolean) => {

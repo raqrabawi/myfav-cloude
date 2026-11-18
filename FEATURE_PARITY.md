@@ -103,3 +103,16 @@ At the owner's request, signing in no longer opens the AccountSyncModal ("Sync l
 - If the merge fails, the browser is not linked and the guest copy stays on the device. A toast says so, and the merge is retried at the next sign-in.
 - "Keep local only" and "Start fresh" are no longer offered at sign-in. Clearing the workspace is still available in Settings.
 - Tests: `tests/unit/signOutFlow.test.tsx` (3 sign-in cases).
+
+## Intentional behaviour change (2026-11-18): Main Page order
+At the owner's request, the **Main Page** (no category selected, no sort button active) now shows:
+1. **Pinned** websites first,
+2. then **most used**, by how many times each website was opened,
+3. then **all others A–Z**, case-insensitive.
+
+Pinned websites are themselves ordered by use, then A–Z.
+
+- **What counts as a use:** opening a website from its title, address or Visit button (left or middle click). The count is stored per website in the account (`open_count`, `last_opened_at`, migration `0003_bookmark_usage.sql`, RPC `myfav_record_bookmark_open`), so it's the same on every device. Guests' counts are kept in the browser.
+- **The list doesn't jump while you use it:** the order is refreshed whenever the Main Page is shown again.
+- **Unchanged:** the "Pinned First" and "A–Z" buttons, and category pages, which keep their category arrangement.
+- **Tests:** `tests/db/usage.test.ts` (6) and an App-level ordering test in `tests/unit/signOutFlow.test.tsx`.

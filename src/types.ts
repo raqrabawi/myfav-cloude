@@ -20,6 +20,10 @@ export interface BookmarkItem {
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
+  /** How many times this website was opened (drives "most used" on the Main Page). */
+  openCount?: number;
+  /** ISO time of the last open, "" if never. */
+  lastOpenedAt?: string;
 }
 
 export type QuickShortcutIconType = 'favicon' | 'lucide' | 'custom';
