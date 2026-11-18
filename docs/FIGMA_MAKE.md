@@ -79,6 +79,18 @@ It then **fails** (CI goes red) if any of these is true:
 - the package would include a path from the do-not-upload list
 - `build` is not `vite build`
 
+## package.json and package-lock.json always go together
+
+Figma Make runs `npm ci` before every publish. It aborts if `package.json` and `package-lock.json`
+disagree, and the publish fails.
+
+That happened on 2026-11-18, after Figma Make itself had updated `jsdom`, `vitest` and a Neon
+override. Those versions now live in this repo.
+
+- **The package script:** always ships the two files together, and refuses to build if they disagree.
+- **If Figma Make changes either file:** copy both back into this repo, so the next update doesn't
+  undo the change.
+
 ## Don'ts in Figma Make
 
 - Don't let Figma Make's AI **add a backend, connect Supabase, or create `supabase/functions`**.
