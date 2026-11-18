@@ -144,8 +144,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
   return (
     <div className="w-full space-y-5 pb-12">
       {/* Unified Top Header (matching Settings page header style) */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={onBackToDirectory}
@@ -154,7 +154,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Websites</span>
           </button>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Categories</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">Categories</h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
             Organize your taxonomy structure, review folder totals, and clean up empty or oversized categories ({rootCategories.length} categories · {totalSubcategories} subcategories).
           </p>
@@ -163,7 +163,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
         <button
           type="button"
           onClick={() => openAddCategoryModal('')}
-          className="min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-lg shadow-black/20"
+          className="w-full sm:w-auto justify-center min-h-[42px] sm:min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-sm sm:text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer sm:shrink-0 shadow-lg shadow-black/20"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Category</span>
@@ -337,7 +337,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto sm:shrink-0">
                         {onOpenShareModal && (
                           <button
                             type="button"
@@ -348,7 +348,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
                                 ? 'Manage public read-only share link'
                                 : 'Generate public read-only share link'
                             }
-                            className={`min-h-[38px] px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                            className={`flex-1 sm:flex-none justify-center min-h-[38px] px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
                               sharedByCategoryId[root.id]
                                 ? 'accent-subtle-bg border accent-border accent-text hover:bg-white/10 font-semibold'
                                 : 'bg-white/5 hover:bg-white/10 text-slate-200'
@@ -367,16 +367,17 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
                         <button
                           type="button"
                           onClick={() => openAddCategoryModal(root.id)}
-                          className="min-h-[38px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="flex-1 sm:flex-none justify-center min-h-[38px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                         >
                           <Plus className="w-3.5 h-3.5 accent-text" />
-                          <span>Add Subcategory</span>
+                          <span className="sm:hidden">Subcategory</span>
+                          <span className="hidden sm:inline">Add Subcategory</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => startEditing(root)}
                           aria-label={`Rename ${root.name}`}
-                          className="min-h-[38px] min-w-[38px] rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
+                          className="shrink-0 min-h-[38px] min-w-[38px] rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -384,7 +385,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerPageProps> = ({
                           type="button"
                           onClick={() => initiateDelete(root)}
                           aria-label={`Delete ${root.name}`}
-                          className="min-h-[38px] min-w-[38px] rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors cursor-pointer"
+                          className="shrink-0 min-h-[38px] min-w-[38px] rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

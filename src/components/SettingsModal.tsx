@@ -289,8 +289,8 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
   return (
     <div className="w-full space-y-5 pb-12">
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={onBackToDirectory}
@@ -299,7 +299,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Websites</span>
           </button>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Settings</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">Settings</h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
             Manage your workspace theme, Chrome bookmarks sync, backups, and Google account.
           </p>
@@ -314,7 +314,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
               setActiveTab('sync');
             }
           }}
-          className="min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-lg shadow-black/20"
+          className="w-full sm:w-auto justify-center min-h-[42px] sm:min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-sm sm:text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer sm:shrink-0 shadow-lg shadow-black/20"
         >
           <Upload className="w-3.5 h-3.5" />
           <span>Import</span>
@@ -326,39 +326,39 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('appearance')}
-          className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`min-h-[40px] sm:min-h-[38px] px-1.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'appearance'
               ? 'accent-bg text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          <Palette className="w-3.5 h-3.5" />
+          <Palette className="hidden sm:block w-3.5 h-3.5" />
           <span>Appearance</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('sync')}
-          className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`min-h-[40px] sm:min-h-[38px] px-1.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'sync'
               ? 'accent-bg text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          <Chrome className="w-3.5 h-3.5" />
+          <Chrome className="hidden sm:block w-3.5 h-3.5" />
           <span>Chrome Sync</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('account')}
-          className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`min-h-[40px] sm:min-h-[38px] px-1.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'account'
               ? 'accent-bg text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          <Cloud className="w-3.5 h-3.5" />
+          <Cloud className="hidden sm:block w-3.5 h-3.5" />
           <span>Account & Data</span>
         </button>
       </div>
@@ -367,7 +367,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
       {activeTab === 'appearance' && (
         <div className="space-y-5">
           {/* Theme Mode: Dark Mode vs Light Mode */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm sm:text-base font-semibold text-slate-100">Theme Mode</h2>
@@ -380,7 +380,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {(
                 [
                   {
@@ -435,7 +435,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           </section>
 
           {/* Theme Accent Color */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm sm:text-base font-semibold text-slate-100">Primary Theme Color</h2>
@@ -460,15 +460,15 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
                     key={preset.id}
                     type="button"
                     onClick={() => onUpdateSettings({ primaryColor: preset.id })}
-                    className={`min-h-[46px] px-3 py-2 rounded-xl border text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                    className={`min-h-[46px] px-2.5 sm:px-3 py-2 rounded-xl border text-left flex items-center justify-between gap-1.5 sm:gap-2 transition-all cursor-pointer ${
                       isSelected
                         ? 'accent-subtle-bg accent-border text-white'
                         : 'bg-slate-950/60 border-white/8 text-slate-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <span className="flex items-center gap-2 min-w-0">
+                    <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                       <span
-                        className="w-4 h-4 rounded-full shrink-0 border border-white/20"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full shrink-0 border border-white/20"
                         style={{ backgroundColor: preset.primary }}
                       />
                       <span className="text-xs font-medium truncate">{preset.name}</span>
@@ -498,7 +498,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           </section>
 
           {/* Interface & Layout */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-5">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-5">
             <h2 className="text-sm sm:text-base font-semibold text-slate-100 flex items-center gap-2">
               <Sparkles className="w-4 h-4 accent-text" />
               <span>Interface & Glass Depth</span>
@@ -655,7 +655,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           )}
 
           {/* METHOD 1: FILE UPLOAD OR PASTE (PRIMARY) */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4 border accent-border">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4 border accent-border">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md accent-subtle-bg accent-text text-[11px] font-semibold">
                 <Upload className="w-3 h-3" />
@@ -854,7 +854,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
 
           {/* HIDDEN FOR NOW: 1-CLICK LIVE CHROME PROFILE LINK (ZERO RE-UPLOAD) */}
           {false && (
-            <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4 border accent-border">
+            <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4 border accent-border">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md accent-subtle-bg accent-text text-[11px] font-semibold">
@@ -1018,7 +1018,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
       {activeTab === 'account' && (
         <div className="space-y-5">
           {/* Cloud Account Sync Card */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl accent-subtle-bg flex items-center justify-center accent-text shrink-0">
@@ -1058,7 +1058,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           </section>
 
           {/* Workspace Stats */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-3">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-3">
             <h2 className="text-sm sm:text-base font-semibold text-slate-100">Workspace Summary</h2>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/8 text-center">
@@ -1078,7 +1078,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           </section>
 
           {/* Backup & Export Section */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl accent-subtle-bg flex items-center justify-center accent-text shrink-0">
@@ -1196,7 +1196,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           </section>
 
           {/* Danger Zone: Clear Data */}
-          <section className="glass-surface rounded-2xl p-5 sm:p-6 space-y-4 border border-rose-500/20">
+          <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4 border border-rose-500/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-sm sm:text-base font-semibold text-rose-300">Clear Workspace</h2>
