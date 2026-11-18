@@ -132,6 +132,19 @@ for (const s of ['dev', 'start']) {
   if (/\b(tsx|node)\s+server\b/.test(pkg.scripts?.[s] ?? '')) problems.push(`package.json: script "${s}" starts a server`);
 }
 if (!/vite\s+build/.test(pkg.scripts?.build ?? '')) problems.push('package.json: "build" must be "vite build"');
+// package.json and package-lock.json must agree, or Figma's `npm ci` aborts before publishing
+// (happened 2026-11-18: an old package.json was uploaded without its lockfile).
+{
+  const lock = JSON.parse(readFileSync(join(out, 'package-lock.json'), 'utf8'));
+  const rootLock = lock.packages?.[''] ?? {};
+  for (const field of ['dependencies', 'devDependencies']) {
+    const a = pkg[field] ?? {};
+    const b = rootLock[field] ?? {};
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (a[k] !== b[k]) problems.push(`package.json and package-lock.json disagree on ${field}.${k}: ${a[k] ?? '(none)'} vs ${b[k] ?? '(none)'}`);
+    }
+  }
+}
 
 if (problems.length) {
   rmSync(outRoot, { recursive: true, force: true }); // never leave a bad package behind
@@ -208,6 +221,10 @@ if (wantUpdate) {
       changed.push(b);
     } else if (status === 'D') removed.push(a);
     else changed.push(a);
+  }
+  // package.json and package-lock.json always travel together.
+  if (changed.includes('package.json') !== changed.includes('package-lock.json')) {
+    for (const f of ['package.json', 'package-lock.json']) if (!changed.includes(f)) changed.push(f);
   }
   const upd = join(outRoot, 'myfav-figma-update');
   mkdirSync(upd, { recursive: true });
