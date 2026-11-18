@@ -33,6 +33,14 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Figma Make package (browser-only check)
+        run: npm run package:figma
+      - name: Upload Figma Make package
+        uses: actions/upload-artifact@v4
+        with:
+          name: myfav-figma-make
+          path: dist-figma/myfav-figma-make/
+          retention-days: 30
       - name: Apply local Neon-equivalent shim + migrations
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client

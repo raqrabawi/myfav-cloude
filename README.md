@@ -68,7 +68,7 @@ Host `dist/` on any static host (Vercel, Netlify, Cloudflare Pages…):
 - add the deployed origin to Neon Auth trusted domains (and the Data API CORS origins if you restrict them)
 - recommended CSP `connect-src`: `https://*.neonauth.<region>.aws.neon.tech https://*.apirest.<region>.aws.neon.tech https://www.google-analytics.com`
 
-**Figma Sites / Figma Make (main site: https://myfav.aqrabawi.com, custom domain on Figma):** these hosts don't inject build-time env vars, so the app falls back to the built-in production URL (`DEFAULT_NEON_URL` in `src/lib/neonClient.ts`). `https://myfav.aqrabawi.com` is on `production`'s Neon Auth trusted domains (with `https://raqrabawi.github.io` for the GitHub Pages copy). After changing code, re-sync it to Figma and republish.
+**Figma Sites / Figma Make (main site: https://myfav.aqrabawi.com, custom domain on Figma):** these hosts don't inject build-time env vars, so the app falls back to the built-in production URL (`DEFAULT_NEON_URL` in `src/lib/neonClient.ts`). `https://myfav.aqrabawi.com` is on `production`'s Neon Auth trusted domains (with `https://raqrabawi.github.io` for the GitHub Pages copy). After changing code, update Figma Make with `npm run package:figma` (or the CI **myfav-figma-make** artifact) and follow **[docs/FIGMA_MAKE.md](docs/FIGMA_MAKE.md)**. The Figma Make project must contain browser code only, or Publish fails with "Server errors detected".
 
 ## 4. Tests
 | Command | What |
