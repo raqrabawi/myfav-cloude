@@ -95,7 +95,7 @@ export const ChromeImportModal: React.FC<ChromeImportModalProps> = ({
     if (plan.bookmarks.length === 0 && plan.categories.length === 0) {
       setImportProgress(null);
       setErrorMsg(
-        'No bookmarks or folders were found. Please select your Chrome "Bookmarks" file or an exported bookmarks HTML file.'
+        'No bookmarks were found in that file. Export your bookmarks as an HTML file from Chrome, Safari, Edge or Firefox (see "How do I export my bookmarks?") and select that file.'
       );
       return;
     }
@@ -173,10 +173,10 @@ export const ChromeImportModal: React.FC<ChromeImportModalProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-base font-bold text-slate-100 truncate">
-                Quick Chrome Bookmarks Import
+                Import Bookmarks
               </h2>
               <p className="text-xs text-slate-400 truncate">
-                Auto-sync &amp; add new Chrome bookmarks into MyFav
+                From Chrome, Safari, Edge or Firefox into MyFav
               </p>
             </div>
           </div>
@@ -214,7 +214,7 @@ export const ChromeImportModal: React.FC<ChromeImportModalProps> = ({
               <div>
                 <p className="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
                   <FolderOpen className="w-3.5 h-3.5 accent-text" />
-                  <span>1-Click Automatic OS Chrome Sync</span>
+                  <span>1-Click Chrome Sync (Chrome only)</span>
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Automatically uses your system&apos;s default Chrome <span className="font-mono text-slate-200">Bookmarks</span> path and starts syncing immediately.
@@ -366,15 +366,47 @@ export const ChromeImportModal: React.FC<ChromeImportModalProps> = ({
               <div>
                 <p className="text-sm font-semibold text-slate-100">
                   {isImporting
-                    ? 'Auto-Importing Chrome Bookmarks...'
-                    : 'Or drop / select any Bookmark file to Auto-Import'}
+                    ? 'Importing your bookmarks...'
+                    : 'Drop or select your exported bookmarks file'}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Directly adds new links from Chrome&apos;s <span className="font-mono text-slate-200">Bookmarks</span> file or <span className="font-mono text-slate-200">bookmarks.html</span>
+                  Works with files exported from Chrome, Safari, Edge and Firefox (<span className="font-mono text-slate-200">.html</span>), or Chrome&apos;s <span className="font-mono text-slate-200">Bookmarks</span> file
                 </p>
               </div>
             </div>
           )}
+
+          {/* How to export bookmarks from each browser */}
+          <details className="group rounded-xl bg-slate-950/60 border border-white/10 px-4 py-3 text-xs text-slate-300">
+            <summary className="cursor-pointer select-none font-semibold text-slate-100 list-none flex items-center justify-between gap-2">
+              <span>How do I export my bookmarks?</span>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform" aria-hidden>
+                ▾
+              </span>
+            </summary>
+            <ul className="mt-3 space-y-2 leading-relaxed">
+              <li>
+                <strong className="text-slate-100">Safari (Mac):</strong> File → Export → Bookmarks…
+                Your Favorites and folders come in as categories; the Reading List is skipped.
+              </li>
+              <li>
+                <strong className="text-slate-100">iPhone / iPad:</strong> Safari can&apos;t export there. Turn on
+                Safari in iCloud settings, then export from a Mac signed in to the same Apple ID, or add
+                websites one by one with Add Website.
+              </li>
+              <li>
+                <strong className="text-slate-100">Chrome:</strong> menu ⋮ → Bookmarks and lists → Bookmark
+                manager → ⋮ → Export bookmarks. Or use 1-Click Chrome Sync above.
+              </li>
+              <li>
+                <strong className="text-slate-100">Edge:</strong> menu ⋯ → Favorites → ⋯ → Export favorites.
+              </li>
+              <li>
+                <strong className="text-slate-100">Firefox:</strong> Bookmarks → Manage bookmarks → Import and
+                Backup → Export Bookmarks to HTML…
+              </li>
+            </ul>
+          </details>
 
           {/* Merge vs Replace Option */}
           <div className="flex items-center justify-between gap-3 pt-1 text-xs text-slate-300">

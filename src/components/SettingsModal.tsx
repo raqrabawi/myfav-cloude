@@ -53,6 +53,7 @@ import {
 } from '../utils/chromeLiveSync';
 import { BackupFormat, triggerBackupDownload } from '../utils/backupExport';
 import { trackEvent } from '../utils/analytics';
+import { InstallAppSection } from './InstallAppSection';
 import { ImportProgressPanel } from './ImportProgressPanel';
 
 interface SettingsPageProps {
@@ -346,7 +347,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
           }`}
         >
           <Chrome className="hidden sm:block w-3.5 h-3.5" />
-          <span>Chrome Sync</span>
+          <span>Import &amp; Sync</span>
         </button>
 
         <button
@@ -663,10 +664,10 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
               </div>
               <h2 className="text-sm sm:text-base font-semibold text-slate-100 flex items-center gap-2">
                 <Upload className="w-4 h-4 accent-text" />
-                <span>Upload Chrome Bookmarks File or Paste</span>
+                <span>Upload a Bookmarks File (Chrome, Safari, Edge, Firefox) or Paste</span>
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Drop an exported <span className="font-mono text-slate-300">bookmarks.html</span> or Chrome <span className="font-mono text-slate-300">Bookmarks</span> JSON file here anytime. By default, MyFav merges only new websites without duplicating existing ones.
+                Drop a <span className="font-mono text-slate-300">bookmarks.html</span> exported from Chrome, Safari, Edge or Firefox, or Chrome&apos;s <span className="font-mono text-slate-300">Bookmarks</span> JSON file, here anytime. Safari: File → Export → Bookmarks…; Edge: Favorites → Export favorites; Firefox: Manage bookmarks → Export Bookmarks to HTML. By default, MyFav merges only new websites without duplicating existing ones.
               </p>
             </div>
 
@@ -722,7 +723,7 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm font-semibold text-slate-100">
-                    Click to browse or drop a Chrome Bookmarks file here
+                    Click to browse or drop your bookmarks file here
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     Smart merge adds only new folders &amp; websites unless &ldquo;Replace existing&rdquo; is checked below
@@ -1017,6 +1018,8 @@ export const SettingsModal: React.FC<SettingsPageProps> = ({
       {/* TAB 3: ACCOUNT & DATA */}
       {activeTab === 'account' && (
         <div className="space-y-5">
+          <InstallAppSection />
+
           {/* Cloud Account Sync Card */}
           <section className="glass-surface rounded-2xl p-4 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

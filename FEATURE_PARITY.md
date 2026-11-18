@@ -116,3 +116,16 @@ Pinned websites are themselves ordered by use, then A–Z.
 - **The list doesn't jump while you use it:** the order is refreshed whenever the Main Page is shown again.
 - **Unchanged:** the "Pinned First" and "A–Z" buttons, and category pages, which keep their category arrangement.
 - **Tests:** `tests/db/usage.test.ts` (6) and an App-level ordering test in `tests/unit/signOutFlow.test.tsx`.
+
+## Additions (2026-11-18): installable app + import from any browser
+- **Install as an app.** `public/manifest.webmanifest`, app icons in `public/icons/` (iPhone 180 px, 192/512 px and a maskable icon), and iOS meta tags. The theme colour follows light/dark.
+  - **iPhone/iPad:** Share → Add to Home Screen opens MyFav full screen as "MyFav".
+  - **Android, Chrome and Edge:** a one-tap Install.
+  - **Mac Safari:** File → Add to Dock.
+- **Install prompt** (`InstallAppPrompt.tsx`): a small card tailored to the device. It's hidden when MyFav is already installed or the browser can't install apps, and "Not now / Got it" hides it for 30 days. A permanent **Install MyFav as an app** section sits in Settings → Account & Data (`InstallAppSection.tsx`).
+- **Import from Safari, Edge and Firefox**, the same `bookmarks.html` format as Chrome.
+  - Each browser's top folder keeps its own name: Safari "Favorites", Edge "Favorites Bar", Firefox "Bookmarks Toolbar". Chrome is unchanged.
+  - Safari's Reading List is skipped.
+  - The import screens are renamed from Chrome-only wording (the Settings tab is now "Import & Sync") and include per-browser export steps.
+- **Fix:** the "My" in the MyFav logo was white-on-white in light mode.
+- **Tests:** 3 new parser tests (Safari, Edge and Firefox fixtures); 5 new e2e tests (Safari import, iPhone card + "Got it", already-installed, one-tap Install + Settings, manifest/icons served).

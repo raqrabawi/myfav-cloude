@@ -136,6 +136,7 @@ const PREFETCH_ON_IDLE = [
   loadChromeImportModal,
 ];
 import { SignInLoadingOverlay, type SignInLoadingStage } from './components/SignInLoadingOverlay';
+import { InstallAppPrompt } from './components/InstallAppPrompt';
 
 const STORAGE_KEYS = {
   CATEGORIES: 'aethermark_categories_v1',
@@ -4402,6 +4403,7 @@ export default function App() {
       )}
 
       <SignInLoadingOverlay stage={signInLoadingStage} />
+      <InstallAppPrompt suppressed={signInLoadingStage !== null || Boolean(authPageMode)} />
 
       <Deferred when={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}>
         <AccountSyncModal

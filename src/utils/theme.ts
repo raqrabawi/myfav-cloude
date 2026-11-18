@@ -68,6 +68,10 @@ export function applyThemeToDom(
     document.body.style.backgroundColor = isLight ? '#f1f5f9' : '#070b14';
     document.body.style.color = isLight ? '#0f172a' : '#f1f5f9';
   }
+  // Browser / installed-app bar colour follows the theme (Android Chrome, Safari tab bar).
+  document
+    .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+    .forEach((m) => m.setAttribute('content', isLight ? '#f1f5f9' : '#070b14'));
 
   root.style.setProperty('--accent-primary', resolved.primary);
   root.style.setProperty('--accent-hover', resolved.hover);

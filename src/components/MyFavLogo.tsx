@@ -66,7 +66,7 @@ export const MyFavLogo: React.FC<MyFavLogoProps> = ({
       {/* Creative Wordmark: MyFav */}
       {showText && (
         <div className="flex items-baseline tracking-tight font-display font-bold leading-none">
-          <span className={`${textSize} text-white`}>My</span>
+          <span className={`${textSize} text-white [html.light_&]:text-slate-900`}>My</span>
           <span
             className={`${textSize} accent-text drop-shadow-[0_0_12px_rgba(var(--accent-rgb),0.4)]`}
           >

@@ -80,3 +80,46 @@ describe('icon / name inference helpers', () => {
     expect(inferFallbackCategoryName('https://github.com/x', 'GitHub').length).toBeGreaterThan(0);
   });
 });
+
+describe('imports from other browsers (same bookmarks.html format)', () => {
+  const placed = (file: string) => {
+    const plan = parseChromeBookmarksExactArrangement(fixture(file));
+    const name = (id: string) => plan.categories.find((c) => c.tempId === id)?.name ?? '';
+    return Object.fromEntries(
+      plan.bookmarks.map((b) => [b.title, name(b.categoryTempId) + (b.subcategoryTempId ? ' > ' + name(b.subcategoryTempId) : '')])
+    );
+  };
+
+  it('Safari (File → Export → Bookmarks): keeps "Favorites", folders become categories, skips Reading List', () => {
+    expect(placed('safari-export.html')).toEqual({
+      Apple: 'Favorites',
+      Figma: 'Favorites',
+      Dribbble: 'Design',
+      Behance: 'Design',
+      'Hacker News': 'Bookmarks Menu',
+      GitHub: 'Work',
+      MDN: 'Work > Docs',
+      Google: 'Bookmarks Bar',
+    });
+    const names = parseChromeBookmarksExactArrangement(fixture('safari-export.html')).categories.map((c) => c.name);
+    expect(names).not.toContain('Reading List');
+  });
+
+  it('Edge (Export favorites): keeps "Favorites Bar"', () => {
+    expect(placed('edge-export.html')).toEqual({
+      Bing: 'Favorites Bar',
+      'BBC News': 'News',
+      'Microsoft Learn': 'Other favorites',
+    });
+  });
+
+  it('Firefox (Export Bookmarks to HTML): keeps "Bookmarks Toolbar", ignores place: links', () => {
+    expect(placed('firefox-export.html')).toEqual({
+      Wikipedia: 'Bookmarks Bar',
+      'Get Help': 'Mozilla Firefox',
+      Mozilla: 'Bookmarks Toolbar',
+      'MDN Web Docs': 'Dev',
+      'Hacker News': 'Bookmarks Bar',
+    });
+  });
+});

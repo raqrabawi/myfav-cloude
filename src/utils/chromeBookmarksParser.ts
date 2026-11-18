@@ -33,6 +33,19 @@ const CHROME_ROOT_WRAPPERS = new Set([
   'synced bookmarks',
 ]);
 
+// Links that sit directly in a browser's top-level folder keep that browser's
+// own name (Safari "Favorites", Edge "Favorites bar", Firefox "Bookmarks
+// Toolbar"); Chrome's folders keep the original "Bookmarks Bar" behaviour.
+const WRAPPER_DISPLAY_NAME: Record<string, string> = {
+  favorites: 'Favorites',
+  'favorites bar': 'Favorites Bar',
+  'bookmarks toolbar': 'Bookmarks Toolbar',
+};
+
+// Safari exports its Reading List (saved articles) with the bookmarks; those
+// aren't favourite websites, so they are not imported.
+const SKIPPED_TOP_LEVEL_FOLDERS = new Set(['reading list']);
+
 const FALLBACK_DISTINCT_ICONS = [
   'compass',
   'layers',
@@ -205,6 +218,7 @@ export function parseChromeBookmarksExactArrangement(
     folderStack: string[]
   ) => {
     if (!/^https?:\/\/.+/i.test(href)) return;
+    if (folderStack[0] && SKIPPED_TOP_LEVEL_FOLDERS.has(folderStack[0].trim().toLowerCase())) return;
 
     const meaningfulFolders = folderStack.filter(
       (f, idx) => !(idx === 0 && CHROME_ROOT_WRAPPERS.has(f.toLowerCase()))
@@ -214,10 +228,11 @@ export function parseChromeBookmarksExactArrangement(
     let subCat: ExtractedChromeCategory | null = null;
 
     if (meaningfulFolders.length === 0) {
+      const wrapperKey = (folderStack[0] || '').trim().toLowerCase();
       const topWrapperName =
-        folderStack[0] && !CHROME_ROOT_WRAPPERS.has(folderStack[0].toLowerCase())
+        folderStack[0] && !CHROME_ROOT_WRAPPERS.has(wrapperKey)
           ? folderStack[0]
-          : 'Bookmarks Bar';
+          : WRAPPER_DISPLAY_NAME[wrapperKey] || 'Bookmarks Bar';
       rootCat = getOrCreateRootCategory(topWrapperName);
     } else if (meaningfulFolders.length === 1) {
       rootCat = getOrCreateRootCategory(meaningfulFolders[0]);
@@ -260,6 +275,9 @@ export function parseChromeBookmarksExactArrangement(
 
         if (Array.isArray(node.children)) {
           const nextStack = nodeTitle ? [...folderStack, nodeTitle] : folderStack;
+          if (nextStack.length === 1 && SKIPPED_TOP_LEVEL_FOLDERS.has(nextStack[0].toLowerCase())) {
+            return;
+          }
           const meaningful = nextStack.filter(
             (f, idx) => !(idx === 0 && CHROME_ROOT_WRAPPERS.has(f.toLowerCase()))
           );
@@ -396,6 +414,9 @@ export function parseChromeBookmarksExactArrangement(
           if (h3 && dl) {
             const folderTitle = (h3.textContent || '').trim();
             const nextStack = folderTitle ? [...folderStack, folderTitle] : folderStack;
+            if (nextStack.length === 1 && SKIPPED_TOP_LEVEL_FOLDERS.has(nextStack[0].toLowerCase())) {
+              continue; // e.g. Safari's Reading List: no category, no links
+            }
             const meaningful = nextStack.filter(
               (f, idx) => !(idx === 0 && CHROME_ROOT_WRAPPERS.has(f.toLowerCase()))
             );
