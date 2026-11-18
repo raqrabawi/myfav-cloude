@@ -2408,7 +2408,7 @@ export default function App() {
       style={{ backgroundColor: isLightMode ? '#F1F5F9' : '#070B14' }}
       className={`min-h-screen transition-colors duration-300 ${
         isLightMode ? 'bg-[#F1F5F9] text-slate-900' : 'bg-[#070B14] text-slate-100'
-      } accent-glow-bg flex flex-col pb-16 lg:pb-0`}
+      } accent-glow-bg flex flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0`}
     >
       {/* Top Navigation Bar with Creative MyFav Logo & Right-Aligned Menu */}
       <header className="sticky top-0 z-30 h-14 lg:h-16 glass-surface border-b border-white/8 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-8">
@@ -3357,8 +3357,8 @@ export default function App() {
           ) : (
             <>
               {/* Unified Top Header (matching Settings & Categories page header style) */}
-              <div className="flex items-center justify-between gap-4">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="min-w-0">
                   {activeView === 'favorites' || selectedCategoryId !== 'all' ? (
                     <button
                       type="button"
@@ -3373,13 +3373,13 @@ export default function App() {
                       <span>Back to Main Page</span>
                     </button>
                   ) : (
-                    <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
+                    <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5 whitespace-nowrap">
                       <span>Directory</span>
                       <span>/</span>
                       <span className="text-slate-200">All Categories</span>
                     </div>
                   )}
-                  <h1 className="text-2xl font-bold tracking-tight text-slate-100">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 break-words">
                     {activeView === 'favorites'
                       ? 'Pinned Favorites'
                       : activeSubcategoryObj
@@ -3399,12 +3399,12 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
                   {!user && (
                     <button
                       type="button"
                       onClick={() => openAuthPage('login')}
-                      className="min-h-[38px] px-3.5 py-2 rounded-xl accent-subtle-bg hover:bg-white/15 border accent-border accent-text text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="flex-1 sm:flex-none justify-center min-h-[42px] sm:min-h-[38px] px-3.5 py-2 rounded-xl accent-subtle-bg hover:bg-white/15 border accent-border accent-text text-sm sm:text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                     >
                       <LogIn className="w-3.5 h-3.5" />
                       <span>Log in</span>
@@ -3417,7 +3417,7 @@ export default function App() {
                       setEditingBookmark(null);
                       setIsBookmarkModalOpen(true);
                     }}
-                    className="min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 shadow-lg shadow-black/20"
+                    className="flex-1 sm:flex-none justify-center min-h-[42px] sm:min-h-[38px] px-4 py-2 rounded-xl accent-bg text-white text-sm sm:text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shadow-lg shadow-black/20"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Website</span>
@@ -3932,7 +3932,7 @@ export default function App() {
                         className={`glass-surface website-card flex flex-col md:flex-row md:items-center justify-between group ${
                           isCompact
                             ? 'rounded-xl px-3 py-1.5 sm:py-2 gap-2'
-                            : 'rounded-2xl p-4 sm:p-4.5 gap-3.5'
+                            : 'rounded-2xl p-3.5 sm:p-4.5 gap-3 sm:gap-3.5'
                         } ${bulkMode ? 'cursor-pointer select-none' : ''} ${
                           isSelected
                             ? 'accent-border ring-1 ring-[var(--accent-primary)]'
@@ -4111,7 +4111,7 @@ export default function App() {
                           className={`flex items-center justify-between md:justify-end shrink-0 ${
                             isCompact
                               ? 'gap-1 pt-1.5 md:pt-0 border-t md:border-t-0 border-white/5'
-                              : 'gap-1.5 pt-2.5 md:pt-0 border-t md:border-t-0 border-white/5'
+                              : 'gap-0.5 sm:gap-1.5 pt-2.5 md:pt-0 border-t md:border-t-0 border-white/5'
                           }`}
                         >
                           <button
@@ -4126,7 +4126,7 @@ export default function App() {
                                 : 'Pin to Top Quick Access Bar'
                             }
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-[var(--accent-light)] hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             <Zap
@@ -4146,7 +4146,7 @@ export default function App() {
                             aria-label={bm.isFavorite ? 'Unpin website' : 'Pin website'}
                             title={bm.isFavorite ? 'Unpin' : 'Pin to favorites'}
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-amber-400 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             <Star
@@ -4162,7 +4162,7 @@ export default function App() {
                             aria-label="Move to another category or subcategory"
                             title="Move to another category or subcategory"
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-[var(--accent-light)] hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -4173,7 +4173,7 @@ export default function App() {
                             onClick={() => handleCopyUrl(bm.id, bm.url)}
                             title="Copy URL"
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             {copiedId === bm.id ? (
@@ -4191,7 +4191,7 @@ export default function App() {
                             }}
                             title="Edit website details"
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -4202,7 +4202,7 @@ export default function App() {
                             onClick={() => handleDeleteBookmark(bm.id)}
                             title="Delete website"
                             className={`${
-                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[36px]'
+                              isCompact ? 'min-h-[28px] min-w-[28px]' : 'min-h-[36px] min-w-[32px] sm:min-w-[36px]'
                             } rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors cursor-pointer`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -4217,8 +4217,8 @@ export default function App() {
                             className={`${
                               isCompact
                                 ? 'min-h-[28px] px-2.5 py-0.5 text-[11px]'
-                                : 'min-h-[36px] px-3.5 py-1 text-xs'
-                            } rounded-lg accent-subtle-bg hover:bg-white/15 accent-text font-semibold flex items-center gap-1 transition-colors whitespace-nowrap ml-0.5`}
+                                : 'min-h-[36px] px-3 sm:px-3.5 py-1 text-xs'
+                            } rounded-lg accent-subtle-bg hover:bg-white/15 accent-text font-semibold flex items-center gap-1 transition-colors whitespace-nowrap ml-0.5 shrink-0`}
                           >
                             <span>Visit</span>
                             <ExternalLink className="w-3 h-3" />
@@ -4235,7 +4235,7 @@ export default function App() {
       </div>
 
       {/* Fixed Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-15 glass-elevated border-t border-white/10 grid grid-cols-4 items-center px-2">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 min-h-15 pb-[env(safe-area-inset-bottom)] glass-elevated border-t border-white/10 grid grid-cols-4 items-center px-2">
         <button
           type="button"
           onClick={() => {
@@ -4250,7 +4250,7 @@ export default function App() {
           }`}
         >
           <Bookmark className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">All Sites</span>
+          <span className="text-[11px] font-medium mt-0.5">Main Page</span>
         </button>
 
         <button
@@ -4264,7 +4264,7 @@ export default function App() {
           }`}
         >
           <Layers className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">Categories</span>
+          <span className="text-[11px] font-medium mt-0.5">Categories</span>
         </button>
 
         <div className="flex items-center justify-center">
@@ -4294,7 +4294,7 @@ export default function App() {
           }`}
         >
           <Settings className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">Settings</span>
+          <span className="text-[11px] font-medium mt-0.5">Settings</span>
         </button>
       </nav>
 
