@@ -18,7 +18,6 @@ import {
   SlidersHorizontal,
   CheckSquare,
   Square,
-  Cloud,
   Copy,
   Check,
   Layers,
@@ -3029,34 +3028,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Sidebar Footer: Cloud Sync */}
-              <div className="pt-3.5 border-t border-white/8">
-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/8 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Cloud className="w-4 h-4 accent-text shrink-0" />
-                    <span className="text-[11px] text-slate-300 truncate">
-                      {user ? user.email || 'Cloud Synced' : 'Local Vault'}
-                    </span>
-                  </div>
-                  {user ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleSignOut()}
-                      className="text-[11px] text-slate-400 hover:text-white cursor-pointer shrink-0"
-                    >
-                      Sign Out
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openAuthPage('login')}
-                      className="text-[11px] font-semibold accent-text hover:underline cursor-pointer shrink-0"
-                    >
-                      Log in
-                    </button>
-                  )}
-                </div>
-              </div>
             </>
           ) : (
             /* COLLAPSED VIEW (Auto Closed by Default with Enhanced Tactile Category Icons) */
@@ -3323,19 +3294,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Collapsed Footer: Cloud Icon */}
-              <div className="pt-3 border-t border-white/8 w-full flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    user ? void handleSignOut() : openAuthPage('login')
-                  }
-                  title={user ? `Signed in as ${user.email} (click to sign out)` : 'Log in to sync'}
-                  className="w-11 h-11 rounded-2xl bg-slate-950/60 border border-white/10 hover:border-white/25 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
-                >
-                  <Cloud className={`w-4 h-4 ${user ? 'accent-text' : 'text-slate-500'}`} />
-                </button>
-              </div>
             </>
           )}
         </aside>
@@ -3518,7 +3476,10 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-stretch gap-3 sm:gap-3.5 flex-wrap pt-0.5">
+                  <div
+                    className="flex items-stretch gap-3 sm:gap-3.5 flex-nowrap overflow-x-auto overscroll-x-contain snap-x snap-proximity -mx-1 px-1 pt-1.5 pb-2"
+                    data-testid="quick-access-row"
+                  >
                     {quickShortcuts.map((shortcut) => (
                       <div
                         key={shortcut.id}
@@ -3537,7 +3498,7 @@ export default function App() {
                           setDraggedShortcutId(null);
                         }}
                         onDragEnd={() => setDraggedShortcutId(null)}
-                        className={`group relative w-[104px] sm:w-[116px] rounded-2xl bg-slate-950/65 hover:bg-white/[0.08] border border-white/10 hover:border-[var(--accent-primary)]/45 hover:-translate-y-0.5 transition-all duration-200 shadow-sm ${
+                        className={`group relative shrink-0 snap-start w-[104px] sm:w-[116px] rounded-2xl bg-slate-950/65 hover:bg-white/[0.08] border border-white/10 hover:border-[var(--accent-primary)]/45 hover:-translate-y-0.5 transition-all duration-200 shadow-sm ${
                           draggedShortcutId === shortcut.id ? 'opacity-40 scale-95' : ''
                         }`}
                       >
@@ -3584,7 +3545,7 @@ export default function App() {
                         setIsShortcutModalOpen(true);
                       }}
                       title="Add another custom website shortcut"
-                      className="group w-[104px] sm:w-[116px] min-h-[100px] sm:min-h-[108px] p-3 rounded-2xl border border-dashed border-white/15 hover:border-[var(--accent-primary)]/50 bg-white/[0.02] hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer"
+                      className="group shrink-0 snap-start w-[104px] sm:w-[116px] min-h-[100px] sm:min-h-[108px] p-3 rounded-2xl border border-dashed border-white/15 hover:border-[var(--accent-primary)]/50 bg-white/[0.02] hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer"
                     >
                       <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-slate-900/60 border border-white/10 group-hover:border-[var(--accent-primary)]/40 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
                         <Plus className="w-5 h-5 accent-text" />

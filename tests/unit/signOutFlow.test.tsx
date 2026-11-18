@@ -105,10 +105,23 @@ async function renderSignedIn() {
   await flush();
 }
 
+// Sign out the way a user now does: Settings -> Account & Data -> Sign Out
+// (the side-nav login/logout button was removed on request).
+const buttonByText = (re: RegExp) =>
+  [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => re.test((b.textContent || '').trim()));
+
 async function clickSignOut() {
-  const btn = host.querySelector<HTMLButtonElement>('button[title^="Signed in as"]');
-  expect(btn, 'header sign-out button').toBeTruthy();
-  await act(async () => btn!.click());
+  const settings = buttonByText(/^Settings$/);
+  expect(settings, 'Settings button').toBeTruthy();
+  await act(async () => settings!.click());
+  for (let i = 0; i < 20 && !buttonByText(/^Account/); i++) await flush(); // lazy Settings page
+  const account = buttonByText(/^Account/);
+  expect(account, 'Account & Data tab').toBeTruthy();
+  await act(async () => account!.click());
+  await flush();
+  const signOut = buttonByText(/^Sign Out$/);
+  expect(signOut, 'Sign Out button').toBeTruthy();
+  await act(async () => signOut!.click());
   await flush();
 }
 
@@ -127,7 +140,7 @@ describe('sign-out in the same tab', () => {
     await clickSignOut();
     expect(host.textContent).not.toContain('Cloud Secret Site');
     expect(host.textContent).not.toContain('Cloud Category');
-    expect(host.querySelector('button[title="Log in to sync"]')).toBeTruthy();
+    expect(buttonByText(/^Log in$/), 'header Log in button').toBeTruthy();
     expect(guestBookmarks()).toEqual([]);
     expect(localStorage.getItem(KEYS.CATEGORIES)).toBe('[]');
     expect(localStorage.getItem(KEYS.LINKED)).toBeNull();
@@ -272,5 +285,16 @@ describe('Main Page order: pinned first, then most used, then A–Z', () => {
     expect(api.recordBookmarkOpen).toHaveBeenCalledWith('zeta');
     // the list doesn't jump while you are on it
     expect(order()).toEqual(['pinA', 'pinB', 'used9', 'used5', 'alpha', 'beta', 'zeta']);
+  });
+});
+
+describe('side nav and Quick Access layout', () => {
+  it('has no login/logout button in the side nav', async () => {
+    localStorage.setItem(KEYS.LINKED, 'u1');
+    await renderSignedIn();
+    const aside = host.querySelector('aside')!;
+    expect(aside.querySelector('button[title^="Signed in as"]')).toBeNull();
+    expect(aside.querySelector('button[title="Log in to sync"]')).toBeNull();
+    expect(aside.textContent).not.toMatch(/Sign Out|Log in|Local Vault/);
   });
 });

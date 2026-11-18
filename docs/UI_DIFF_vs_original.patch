@@ -1,6 +1,6 @@
 diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
 --- orig/MyFav-main/src/App.tsx	2026-11-16 12:33:49.000000000 +0300
-+++ myfav-cloude/src/App.tsx	2026-11-18 11:38:10.436726492 +0300
++++ myfav-cloude/src/App.tsx	2026-11-18 13:12:17.077303736 +0300
 @@ -3,7 +3,7 @@
   * SPDX-License-Identifier: Apache-2.0
   */
@@ -10,7 +10,15 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  import {
    Search,
    Plus,
-@@ -39,17 +39,17 @@
+@@ -18,7 +18,6 @@
+   SlidersHorizontal,
+   CheckSquare,
+   Square,
+-  Cloud,
+   Copy,
+   Check,
+   Layers,
+@@ -39,17 +38,17 @@
    LogIn,
  } from 'lucide-react';
  import {
@@ -33,7 +41,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  import { apiClient } from './lib/apiClient';
  import {
    BookmarkItem,
-@@ -87,20 +87,56 @@
+@@ -87,20 +86,56 @@
    pickLiveChromeBookmarksFile,
    readLinkedChromeFile,
  } from './utils/chromeLiveSync';
@@ -103,7 +111,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  
  const STORAGE_KEYS = {
    CATEGORIES: 'aethermark_categories_v1',
-@@ -120,11 +156,69 @@
+@@ -120,11 +155,69 @@
    return `${prefix}_${Date.now()}_${randomPart}`;
  }
  
@@ -173,7 +181,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    const freshSignInTriggeredRef = useRef(false);
    const [syncGateStatus, setSyncGateStatus] = useState<
      'idle' | 'checking' | 'awaiting_choice' | 'ready'
-@@ -142,37 +236,9 @@
+@@ -142,37 +235,9 @@
    const [syncChoiceError, setSyncChoiceError] = useState('');
  
    // Local / Synced Data State — automatically purges all previous demo categories, subcategories, and websites
@@ -213,7 +221,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  
    const [settings, setSettings] = useState<UserSettings>(() => {
      try {
-@@ -193,20 +259,7 @@
+@@ -193,20 +258,7 @@
      };
    });
  
@@ -235,7 +243,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
  
    const localCategoriesRef = useRef<CategoryItem[]>(categories);
    const localBookmarksRef = useRef<BookmarkItem[]>(bookmarks);
-@@ -472,6 +525,15 @@
+@@ -472,6 +524,15 @@
  
    const handleSignOut = async () => {
      try {
@@ -251,7 +259,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        localStorage.removeItem(STORAGE_KEYS.CLOUD_LINKED_UID);
      } catch {
        // ignore
-@@ -481,7 +543,28 @@
+@@ -481,7 +542,28 @@
      await signOutUser();
    };
  
@@ -281,7 +289,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    useEffect(() => {
      let cancelled = false;
      const unsub = onAuthStateChanged(auth, async (currentUser) => {
-@@ -489,6 +572,19 @@
+@@ -489,6 +571,19 @@
  
        if (!currentUser) {
          freshSignInTriggeredRef.current = false;
@@ -301,7 +309,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          setUser(null);
          setAuthReady(true);
          setSyncGateStatus('idle');
-@@ -497,6 +593,7 @@
+@@ -497,6 +592,7 @@
          return;
        }
  
@@ -309,7 +317,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        setUser(currentUser);
        setAuthReady(true);
  
-@@ -507,7 +604,10 @@
+@@ -507,7 +603,10 @@
          // ignore
        }
  
@@ -321,7 +329,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        freshSignInTriggeredRef.current = false;
  
        // Returning session for already-linked account: attach listeners seamlessly
-@@ -517,31 +617,60 @@
+@@ -517,31 +616,60 @@
          return;
        }
  
@@ -399,7 +407,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        }
      });
  
-@@ -551,7 +680,7 @@
+@@ -551,7 +679,7 @@
      };
    }, []);
  
@@ -408,7 +416,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    useEffect(() => {
      if (!authReady || !user || syncGateStatus !== 'ready') {
        if (!user) {
-@@ -564,8 +693,14 @@
+@@ -564,8 +692,14 @@
      let cancelled = false;
      setCloudLoading(true);
  
@@ -425,7 +433,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
        .then((data) => {
          if (cancelled) return;
          setCategories(data.categories);
-@@ -773,6 +908,38 @@
+@@ -773,6 +907,38 @@
      return map;
    }, [categories]);
  
@@ -464,7 +472,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    // Filtered and Sorted Bookmarks (preserves Chrome import arrangement by default)
    const filteredBookmarks = useMemo(() => {
      return bookmarks
-@@ -802,6 +969,14 @@
+@@ -802,6 +968,14 @@
          if (sortBy === 'alpha') {
            return a.title.localeCompare(b.title);
          }
@@ -479,7 +487,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          if (sortBy === 'favorites') {
            if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
          }
-@@ -828,6 +1003,8 @@
+@@ -828,6 +1002,8 @@
      searchQuery,
      sortBy,
      categoryMap,
@@ -488,7 +496,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    ]);
  
    // Clear Entire Workspace (Categories, Subcategories, Bookmarks, and Quick Shortcuts)
-@@ -2126,7 +2303,7 @@
+@@ -2126,7 +2302,7 @@
        );
      }
  
@@ -497,7 +505,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
      if (user) {
        let extraIdx = reorderedSiblings.length;
        await apiClient.reorderCategoryTree({
-@@ -2189,27 +2366,44 @@
+@@ -2189,27 +2365,44 @@
    if (activeShareId) {
      return (
        <>
@@ -559,7 +567,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
    return (
      <div
        style={{ backgroundColor: isLightMode ? '#F1F5F9' : '#070B14' }}
-@@ -2233,7 +2427,7 @@
+@@ -2233,7 +2426,7 @@
            <MyFavLogo size="md" />
          </a>
  
@@ -568,7 +576,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300 ml-auto">
            {liveSyncToast && (
              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-@@ -2262,7 +2456,7 @@
+@@ -2262,7 +2455,7 @@
                    : 'text-slate-400'
                }`}
              />
@@ -577,7 +585,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
            </button>
  
            <button
-@@ -2355,7 +2549,7 @@
+@@ -2355,7 +2548,7 @@
  
                  {/* Scrollable Category & Subcategory Tree */}
                  <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-2.5">
@@ -586,7 +594,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <button
                      type="button"
                      onClick={() => {
-@@ -2379,7 +2573,7 @@
+@@ -2379,7 +2572,7 @@
                        >
                          <Bookmark className="w-4 h-4" strokeWidth={2.1} />
                        </span>
@@ -595,7 +603,42 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                      </div>
                      <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[10px] font-mono-tabular text-slate-400">
                        {bookmarks.length}
-@@ -2883,7 +3077,7 @@
+@@ -2835,34 +3028,6 @@
+                 </div>
+               </div>
+ 
+-              {/* Sidebar Footer: Cloud Sync */}
+-              <div className="pt-3.5 border-t border-white/8">
+-                <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/8 flex items-center justify-between gap-2">
+-                  <div className="flex items-center gap-2 min-w-0">
+-                    <Cloud className="w-4 h-4 accent-text shrink-0" />
+-                    <span className="text-[11px] text-slate-300 truncate">
+-                      {user ? user.email || 'Cloud Synced' : 'Local Vault'}
+-                    </span>
+-                  </div>
+-                  {user ? (
+-                    <button
+-                      type="button"
+-                      onClick={() => void handleSignOut()}
+-                      className="text-[11px] text-slate-400 hover:text-white cursor-pointer shrink-0"
+-                    >
+-                      Sign Out
+-                    </button>
+-                  ) : (
+-                    <button
+-                      type="button"
+-                      onClick={() => openAuthPage('login')}
+-                      className="text-[11px] font-semibold accent-text hover:underline cursor-pointer shrink-0"
+-                    >
+-                      Log in
+-                    </button>
+-                  )}
+-                </div>
+-              </div>
+             </>
+           ) : (
+             /* COLLAPSED VIEW (Auto Closed by Default with Enhanced Tactile Category Icons) */
+@@ -2883,7 +3048,7 @@
  
                  {/* Vertical Enhanced Category Icons List */}
                  <div className="flex-1 overflow-y-auto space-y-2.5 py-3 w-full flex flex-col items-center no-scrollbar">
@@ -604,7 +647,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                    <div className="relative flex flex-col items-center w-full">
                      {activeView === 'all' && selectedCategoryId === 'all' && (
                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full accent-bg shadow-[0_0_10px_var(--accent-primary)]" />
-@@ -2895,8 +3089,8 @@
+@@ -2895,8 +3060,8 @@
                          setSelectedCategoryId('all');
                          setSelectedSubcategoryId('all');
                        }}
@@ -615,7 +658,27 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                        className={`group/icon relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                          activeView === 'all' && selectedCategoryId === 'all'
                            ? 'accent-bg text-white shadow-[0_6px_16px_rgba(var(--accent-rgb),0.35)] scale-105'
-@@ -3149,51 +3343,59 @@
+@@ -3129,19 +3294,6 @@
+                 </div>
+               </div>
+ 
+-              {/* Collapsed Footer: Cloud Icon */}
+-              <div className="pt-3 border-t border-white/8 w-full flex flex-col items-center">
+-                <button
+-                  type="button"
+-                  onClick={() =>
+-                    user ? void handleSignOut() : openAuthPage('login')
+-                  }
+-                  title={user ? `Signed in as ${user.email} (click to sign out)` : 'Log in to sync'}
+-                  className="w-11 h-11 rounded-2xl bg-slate-950/60 border border-white/10 hover:border-white/25 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+-                >
+-                  <Cloud className={`w-4 h-4 ${user ? 'accent-text' : 'text-slate-500'}`} />
+-                </button>
+-              </div>
+             </>
+           )}
+         </aside>
+@@ -3149,51 +3301,59 @@
          {/* Main Viewport */}
          <main className="flex-1 min-w-0 space-y-5">
            {activeView === 'categories' ? (
@@ -719,7 +782,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
            ) : (
              <>
                {/* Unified Top Header (matching Settings & Categories page header style) */}
-@@ -3210,7 +3412,7 @@
+@@ -3210,7 +3370,7 @@
                        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-1.5"
                      >
                        <ArrowLeft className="w-3.5 h-3.5" />
@@ -728,7 +791,37 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                      </button>
                    ) : (
                      <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
-@@ -3832,6 +4034,8 @@
+@@ -3316,7 +3476,10 @@
+                     </button>
+                   </div>
+                 ) : (
+-                  <div className="flex items-stretch gap-3 sm:gap-3.5 flex-wrap pt-0.5">
++                  <div
++                    className="flex items-stretch gap-3 sm:gap-3.5 flex-nowrap overflow-x-auto overscroll-x-contain snap-x snap-proximity -mx-1 px-1 pt-1.5 pb-2"
++                    data-testid="quick-access-row"
++                  >
+                     {quickShortcuts.map((shortcut) => (
+                       <div
+                         key={shortcut.id}
+@@ -3335,7 +3498,7 @@
+                           setDraggedShortcutId(null);
+                         }}
+                         onDragEnd={() => setDraggedShortcutId(null)}
+-                        className={`group relative w-[104px] sm:w-[116px] rounded-2xl bg-slate-950/65 hover:bg-white/[0.08] border border-white/10 hover:border-[var(--accent-primary)]/45 hover:-translate-y-0.5 transition-all duration-200 shadow-sm ${
++                        className={`group relative shrink-0 snap-start w-[104px] sm:w-[116px] rounded-2xl bg-slate-950/65 hover:bg-white/[0.08] border border-white/10 hover:border-[var(--accent-primary)]/45 hover:-translate-y-0.5 transition-all duration-200 shadow-sm ${
+                           draggedShortcutId === shortcut.id ? 'opacity-40 scale-95' : ''
+                         }`}
+                       >
+@@ -3382,7 +3545,7 @@
+                         setIsShortcutModalOpen(true);
+                       }}
+                       title="Add another custom website shortcut"
+-                      className="group w-[104px] sm:w-[116px] min-h-[100px] sm:min-h-[108px] p-3 rounded-2xl border border-dashed border-white/15 hover:border-[var(--accent-primary)]/50 bg-white/[0.02] hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer"
++                      className="group shrink-0 snap-start w-[104px] sm:w-[116px] min-h-[100px] sm:min-h-[108px] p-3 rounded-2xl border border-dashed border-white/15 hover:border-[var(--accent-primary)]/50 bg-white/[0.02] hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 flex flex-col items-center justify-center gap-2.5 transition-all cursor-pointer"
+                     >
+                       <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-slate-900/60 border border-white/10 group-hover:border-[var(--accent-primary)]/40 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+                         <Plus className="w-5 h-5 accent-text" />
+@@ -3832,6 +3995,8 @@
                                  href={bm.url}
                                  target="_blank"
                                  rel="noopener noreferrer"
@@ -737,7 +830,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                                  className="text-xs sm:text-[13px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1 max-w-[200px] sm:max-w-[260px] shrink-0"
                                >
                                  <span className="truncate">{bm.title}</span>
-@@ -3845,6 +4049,8 @@
+@@ -3845,6 +4010,8 @@
                                  href={bm.url}
                                  target="_blank"
                                  rel="noopener noreferrer"
@@ -746,7 +839,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                                  title={bm.url}
                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-[11px] font-medium hover:bg-[var(--accent-primary)]/25 transition-colors truncate max-w-[220px] sm:max-w-xs lg:max-w-md"
                                >
-@@ -3880,6 +4086,8 @@
+@@ -3880,6 +4047,8 @@
                                    href={bm.url}
                                    target="_blank"
                                    rel="noopener noreferrer"
@@ -755,7 +848,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                                    className="text-base sm:text-[17px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1.5"
                                  >
                                    <span className="truncate">{bm.title}</span>
-@@ -3905,6 +4113,8 @@
+@@ -3905,6 +4074,8 @@
                                    href={bm.url}
                                    target="_blank"
                                    rel="noopener noreferrer"
@@ -764,7 +857,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                                    title={bm.url}
                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-xs font-semibold hover:bg-[var(--accent-primary)]/25 hover:border-[var(--accent-primary)]/50 transition-colors truncate max-w-[260px] sm:max-w-md lg:max-w-xl shadow-xs"
                                  >
-@@ -4041,6 +4251,8 @@
+@@ -4041,6 +4212,8 @@
                              href={bm.url}
                              target="_blank"
                              rel="noopener noreferrer"
@@ -773,7 +866,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
                              className={`${
                                isCompact
                                  ? 'min-h-[28px] px-2.5 py-0.5 text-[11px]'
-@@ -4126,76 +4338,90 @@
+@@ -4126,76 +4299,90 @@
        </nav>
  
        {/* Modals for Saving/Editing or Moving a Website */}
@@ -930,7 +1023,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/App.tsx myfav-cloude/src/App.tsx
          <ShareCategoryModal
            category={sharingCategory}
            subcategories={subcategoriesByParent[sharingCategory.id] || []}
-@@ -4211,52 +4437,59 @@
+@@ -4211,52 +4398,59 @@
            onPreviewSharedPage={handleOpenSharePreview}
            onClose={() => setSharingCategory(null)}
          />
@@ -1068,7 +1161,7 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/components/CategoryIcon.tsx myfav-clo
          />
 diff -ru -x '*.test.*' orig/MyFav-main/src/components/CategoryManagerModal.tsx myfav-cloude/src/components/CategoryManagerModal.tsx
 --- orig/MyFav-main/src/components/CategoryManagerModal.tsx	2026-11-16 12:33:49.000000000 +0300
-+++ myfav-cloude/src/components/CategoryManagerModal.tsx	2026-11-18 11:46:05.530566967 +0300
++++ myfav-cloude/src/components/CategoryManagerModal.tsx	2026-11-18 11:47:03.618684431 +0300
 @@ -10,11 +10,7 @@
    X,
    Share2,
@@ -1614,6 +1707,60 @@ diff -ru -x '*.test.*' orig/MyFav-main/src/components/WebsitePreviewModal.tsx my
                <span>Open Website</span>
 Only in orig/MyFav-main/src: db
 Only in orig/MyFav-main/src: firebase.ts
+diff -ru -x '*.test.*' orig/MyFav-main/src/index.css myfav-cloude/src/index.css
+--- orig/MyFav-main/src/index.css	2026-11-16 12:33:49.000000000 +0300
++++ myfav-cloude/src/index.css	2026-11-18 12:19:02.147711544 +0300
+@@ -290,13 +290,49 @@
+   background-color: #e2e8f0;
+ }
+ 
++/* Quick Access cards and other surfaces that previously stayed dark in Light Mode */
++html.light .bg-slate-950\/65 {
++  background-color: #ffffff;
++  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05);
++}
++
++html.light .bg-slate-950\/85,
++html.light .bg-slate-900\/85 {
++  background-color: rgba(248, 250, 252, 0.92);
++}
++
++html.light .bg-white\/\[0\.02\] {
++  background-color: rgba(255, 255, 255, 0.6);
++}
++
++html.light .bg-white\/\[0\.06\] {
++  background-color: #f1f5f9;
++}
++
++html.light .hover\:bg-white\/\[0\.06\]:hover,
++html.light .hover\:bg-white\/\[0\.08\]:hover {
++  background-color: #f8fafc;
++}
++
++html.light .hover\:bg-slate-800:hover {
++  background-color: #e2e8f0;
++}
++
++/* Collapsed sidebar: the selected item's count badge (bg-slate-950 + text-white)
++   turns light in Light Mode, so its number needs dark text to stay visible. */
++html.light .bg-slate-950.text-white {
++  color: #0f172a;
++}
++
+ /* Crisp borders for unselected items, inputs, and dividers in Light Mode */
+ html.light .border-white\/5,
+ html.light .border-white\/6,
+ html.light .border-white\/8,
+ html.light .border-white\/10,
++html.light .border-white\/12,
+ html.light .border-white\/15,
+-html.light .border-white\/20 {
++html.light .border-white\/20,
++html.light .border-white\/25 {
+   border-color: rgba(15, 23, 42, 0.12);
+ }
+ 
 diff -ru -x '*.test.*' orig/MyFav-main/src/lib/apiClient.ts myfav-cloude/src/lib/apiClient.ts
 --- orig/MyFav-main/src/lib/apiClient.ts	2026-11-16 12:33:49.000000000 +0300
 +++ myfav-cloude/src/lib/apiClient.ts	2026-11-18 11:38:10.436726492 +0300
