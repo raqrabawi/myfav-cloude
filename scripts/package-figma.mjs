@@ -7,6 +7,12 @@
 // pg / Drizzle / Firebase Admin). Uploading files into Figma Make adds and
 // replaces, but never deletes, so the package also ships a DELETE list.
 // See docs/FIGMA_MAKE.md.
+//
+// Update mode:  npm run package:figma -- --since <git ref>   (default ref: figma-live tag)
+//   Also writes dist-figma/myfav-figma-update/ (+ .zip) with ONLY the app files
+//   that changed since <ref>, and a DELETE list of app files removed since then.
+//   The `figma-live` git tag marks the version currently in Figma Make; move it
+//   after each confirmed publish:  git tag -f figma-live <commit> && git push -f origin figma-live
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -170,6 +176,73 @@ try {
 } catch {
   console.warn('zip not available: folder created without the .zip');
 }
+// --- Update package: only what changed since the version in Figma Make -----
+const sinceIdx = process.argv.indexOf('--since');
+const wantUpdate = sinceIdx !== -1 || process.argv.includes('--update');
+if (wantUpdate) {
+  const since = (sinceIdx !== -1 && process.argv[sinceIdx + 1]) || 'figma-live';
+  const git = (...args) => execFileSync('git', args, { cwd: root }).toString().trim();
+  let fromCommit;
+  try {
+    fromCommit = git('rev-parse', '--short', `${since}^{commit}`);
+  } catch {
+    console.error(`Update package: unknown ref "${since}". Fetch tags (git fetch --tags) or pass --since <commit>.`);
+    process.exit(1);
+  }
+  const scope = [...ROOT_FILES, ...ROOT_DIRS];
+  const lines = git('diff', '--name-status', '-M', `${fromCommit}`, 'HEAD', '--', ...scope)
+    .split('\n')
+    .filter(Boolean);
+  const changed = [];
+  const removed = [];
+  for (const line of lines) {
+    const [status, a, b] = line.split('\t');
+    if (status.startsWith('R')) {
+      removed.push(a);
+      changed.push(b);
+    } else if (status === 'D') removed.push(a);
+    else changed.push(a);
+  }
+  const upd = join(outRoot, 'myfav-figma-update');
+  mkdirSync(upd, { recursive: true });
+  const updFiles = [];
+  for (const rel of changed) {
+    if (excluded(rel) || !copied.includes(rel)) continue; // only files that belong in Figma Make
+    mkdirSync(join(upd, rel, '..'), { recursive: true });
+    cpSync(join(out, rel), join(upd, rel));
+    updFiles.push(rel);
+  }
+  const toDelete = removed.filter((rel) => !excluded(rel));
+  const to = git('rev-parse', '--short', 'HEAD');
+  writeFileSync(
+    join(upd, 'FIGMA_UPDATE.md'),
+    `# MyFav: Figma Make update ${fromCommit} -> ${to}
+
+This contains only the files that changed since the version in Figma Make (${fromCommit}).
+
+## 1. Replace / add these ${updFiles.length} file(s), keeping the same paths
+${updFiles.length ? updFiles.map((f) => '- `' + f + '`').join('\n') : '- (none)'}
+
+## 2. Delete these ${toDelete.length} file(s) from Figma Make
+${toDelete.length ? toDelete.map((f) => '- `' + f + '`').join('\n') : '- (none)'}
+
+Also make sure nothing from FIGMA_DELETE_LIST.txt (in the full package) exists in the project.
+
+## 3. Publish, then check https://myfav.aqrabawi.com
+`
+  );
+  const zipName = `myfav-figma-update-${fromCommit}-to-${to}.zip`;
+  try {
+    execFileSync('zip', ['-qr', join(outRoot, zipName), '.'], { cwd: upd });
+  } catch {
+    console.warn('zip not available: update folder created without the .zip');
+  }
+  console.log(`Figma Make UPDATE ${fromCommit} -> ${to}: ${updFiles.length} file(s) to replace, ${toDelete.length} to delete.`);
+  for (const f of updFiles) console.log(`  replace: ${f}`);
+  for (const f of toDelete) console.log(`  delete:  ${f}`);
+  console.log(`  zip:     ${relative(root, join(outRoot, zipName))}`);
+}
+
 console.log(`Figma Make package OK: ${copied.length} files, no server code (commit ${commit}).`);
 console.log(`  folder: ${relative(root, out)}`);
 console.log(`  zip:    ${relative(root, join(outRoot, 'myfav-figma-make.zip'))}`);

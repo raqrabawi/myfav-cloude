@@ -23,9 +23,30 @@ The cause was leftovers from the original Firebase + Express app. Removing them 
 **Uploading files into Figma Make adds and replaces files but never deletes them.** Old files stay
 until someone removes them, so every update must also say what to delete.
 
-## How to update the live site
+## Updating with only the changed files (normal way)
 
-1. Get the package. Use either of these:
+The git tag **`figma-live`** marks the version currently in Figma Make. Every update package is
+measured from that tag.
+
+- `npm run package:figma -- --since figma-live` writes
+  `dist-figma/myfav-figma-update-<from>-to-<to>.zip`. It contains only the app files that changed,
+  plus `FIGMA_UPDATE.md`, which lists what to **replace** and what to **delete**.
+- CI builds the same package for every commit on `main` as the **myfav-figma-update** artifact.
+- After each change, Claude sends this zip as a download link.
+
+Steps in Figma Make:
+1. Replace or add the files listed in `FIGMA_UPDATE.md`, keeping the same paths.
+2. Delete the files it lists.
+3. Publish.
+
+**After a confirmed publish, move the tag** so the next update starts from the new version:
+`git tag -f figma-live <commit> && git push -f origin figma-live`.
+If an update is skipped, the next one still includes its files, because the package is always
+measured from `figma-live`, not from the previous update.
+
+## Full package (first upload, or to reset the project)
+
+1. Get the full package. Use either of these:
    - **Locally:** run `npm run package:figma`. It writes `dist-figma/myfav-figma-make/` and
      `dist-figma/myfav-figma-make.zip`.
    - **From GitHub:** open the latest **CI** run on `main` and download the **myfav-figma-make**
