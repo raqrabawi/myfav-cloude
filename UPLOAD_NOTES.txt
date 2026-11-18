@@ -1,0 +1,7 @@
+MyFav — source code (latest main, commit 3e290d5)
+
+For Figma Make: import/replace the project files with the contents of this folder.
+- No environment variables are needed. The app connects to the Neon production
+  backend by default (DEFAULT_NEON_URL in src/lib/neonClient.ts).
+- Main site: https://myfav.aqrabawi.com (already on Neon's allowed sign-in sites).
+- Build: npm install && npm run build  ->  output in dist/

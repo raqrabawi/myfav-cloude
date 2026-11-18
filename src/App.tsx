@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -41,6 +41,7 @@ import {
 import {
   auth,
   consumeOAuthFreshSignInFlag,
+  OAUTH_FRESH_SIGNIN_KEY,
   onAuthStateChanged,
   registerWithEmail,
   sendPasswordReset,
@@ -86,20 +87,56 @@ import {
   pickLiveChromeBookmarksFile,
   readLinkedChromeFile,
 } from './utils/chromeLiveSync';
-import { BookmarkModal } from './components/BookmarkModal';
-import { MoveWebsiteModal } from './components/MoveWebsiteModal';
-import { BatchEditModal, BatchEditPayload } from './components/BatchEditModal';
-import { CategoryManagerModal as CategoriesPage } from './components/CategoryManagerModal';
-import { SettingsModal as SettingsPage } from './components/SettingsModal';
-import { ChromeSyncPage } from './components/ChromeSyncPage';
-import { WebsitePreviewModal } from './components/WebsitePreviewModal';
-import { QuickShortcutModal } from './components/QuickShortcutModal';
-import { ChromeImportModal } from './components/ChromeImportModal';
+import type { BatchEditPayload } from './components/BatchEditModal';
 import { MyFavLogo } from './components/MyFavLogo';
-import { ShareCategoryModal } from './components/ShareCategoryModal';
-import { SharedCollectionView } from './components/SharedCollectionView';
-import { AccountSyncModal } from './components/AccountSyncModal';
-import { AuthPage, AuthPageMode } from './components/AuthPage';
+import type { AuthPageMode } from './components/AuthPage';
+import { Deferred } from './components/Deferred';
+
+// Screens and dialogs that are not needed for the first paint of the Main Page
+// load on demand (and are prefetched in the background once the app is idle).
+const loadBookmarkModal = () => import('./components/BookmarkModal');
+const loadMoveWebsiteModal = () => import('./components/MoveWebsiteModal');
+const loadBatchEditModal = () => import('./components/BatchEditModal');
+const loadCategoriesPage = () => import('./components/CategoryManagerModal');
+const loadSettingsPage = () => import('./components/SettingsModal');
+const loadWebsitePreviewModal = () => import('./components/WebsitePreviewModal');
+const loadQuickShortcutModal = () => import('./components/QuickShortcutModal');
+const loadChromeImportModal = () => import('./components/ChromeImportModal');
+const loadShareCategoryModal = () => import('./components/ShareCategoryModal');
+const loadSharedCollectionView = () => import('./components/SharedCollectionView');
+const loadAccountSyncModal = () => import('./components/AccountSyncModal');
+const loadAuthPage = () => import('./components/AuthPage');
+
+const BookmarkModal = lazy(() => loadBookmarkModal().then((m) => ({ default: m.BookmarkModal })));
+const MoveWebsiteModal = lazy(() => loadMoveWebsiteModal().then((m) => ({ default: m.MoveWebsiteModal })));
+const BatchEditModal = lazy(() => loadBatchEditModal().then((m) => ({ default: m.BatchEditModal })));
+const CategoriesPage = lazy(() => loadCategoriesPage().then((m) => ({ default: m.CategoryManagerModal })));
+const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsModal })));
+const WebsitePreviewModal = lazy(() =>
+  loadWebsitePreviewModal().then((m) => ({ default: m.WebsitePreviewModal }))
+);
+const QuickShortcutModal = lazy(() => loadQuickShortcutModal().then((m) => ({ default: m.QuickShortcutModal })));
+const ChromeImportModal = lazy(() => loadChromeImportModal().then((m) => ({ default: m.ChromeImportModal })));
+const ShareCategoryModal = lazy(() => loadShareCategoryModal().then((m) => ({ default: m.ShareCategoryModal })));
+const SharedCollectionView = lazy(() =>
+  loadSharedCollectionView().then((m) => ({ default: m.SharedCollectionView }))
+);
+const AccountSyncModal = lazy(() => loadAccountSyncModal().then((m) => ({ default: m.AccountSyncModal })));
+const AuthPage = lazy(() => loadAuthPage().then((m) => ({ default: m.AuthPage })));
+
+const PREFETCH_ON_IDLE = [
+  loadAuthPage,
+  loadBookmarkModal,
+  loadWebsitePreviewModal,
+  loadSettingsPage,
+  loadCategoriesPage,
+  loadQuickShortcutModal,
+  loadMoveWebsiteModal,
+  loadBatchEditModal,
+  loadShareCategoryModal,
+  loadChromeImportModal,
+];
+import { SignInLoadingOverlay, type SignInLoadingStage } from './components/SignInLoadingOverlay';
 
 const STORAGE_KEYS = {
   CATEGORIES: 'aethermark_categories_v1',
@@ -119,11 +156,69 @@ function generateCleanId(prefix: string): string {
   return `${prefix}_${Date.now()}_${randomPart}`;
 }
 
+
+// Guest (signed-out) workspace as stored in this browser. Used on first load
+// and again on sign-out, so a signed-out page never keeps showing cloud data.
+function readLocalCategories(): CategoryItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    if (saved) {
+      const parsed: CategoryItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((c) => !DEMO_CATEGORY_IDS.has(c.id));
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return INITIAL_CATEGORIES;
+}
+
+function readLocalBookmarks(): BookmarkItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
+    if (saved) {
+      const parsed: BookmarkItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (b) => !DEMO_BOOKMARK_IDS.has(b.id) && !DEMO_CATEGORY_IDS.has(b.categoryId)
+        );
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return INITIAL_BOOKMARKS;
+}
+
+function readLocalQuickShortcuts(): QuickShortcutItem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.QUICK_SHORTCUTS);
+    if (saved) {
+      const parsed: QuickShortcutItem[] = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => a.order - b.order);
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return [];
+}
+
 export default function App() {
   // Auth & Cloud Sync Gate State
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [cloudLoading, setCloudLoading] = useState(false);
+  // Page opened by returning from Google sign-in: show the loader until auth resolves.
+  const [returningFromSignIn] = useState(() => {
+    try {
+      return sessionStorage.getItem(OAUTH_FRESH_SIGNIN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const freshSignInTriggeredRef = useRef(false);
   const [syncGateStatus, setSyncGateStatus] = useState<
     'idle' | 'checking' | 'awaiting_choice' | 'ready'
@@ -141,37 +236,9 @@ export default function App() {
   const [syncChoiceError, setSyncChoiceError] = useState('');
 
   // Local / Synced Data State — automatically purges all previous demo categories, subcategories, and websites
-  const [categories, setCategories] = useState<CategoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-      if (saved) {
-        const parsed: CategoryItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((c) => !DEMO_CATEGORY_IDS.has(c.id));
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return INITIAL_CATEGORIES;
-  });
+  const [categories, setCategories] = useState<CategoryItem[]>(readLocalCategories);
 
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
-      if (saved) {
-        const parsed: BookmarkItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (b) => !DEMO_BOOKMARK_IDS.has(b.id) && !DEMO_CATEGORY_IDS.has(b.categoryId)
-          );
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return INITIAL_BOOKMARKS;
-  });
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(readLocalBookmarks);
 
   const [settings, setSettings] = useState<UserSettings>(() => {
     try {
@@ -192,20 +259,7 @@ export default function App() {
     };
   });
 
-  const [quickShortcuts, setQuickShortcuts] = useState<QuickShortcutItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.QUICK_SHORTCUTS);
-      if (saved) {
-        const parsed: QuickShortcutItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.sort((a, b) => a.order - b.order);
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-    return [];
-  });
+  const [quickShortcuts, setQuickShortcuts] = useState<QuickShortcutItem[]>(readLocalQuickShortcuts);
 
   const localCategoriesRef = useRef<CategoryItem[]>(categories);
   const localBookmarksRef = useRef<BookmarkItem[]>(bookmarks);
@@ -471,6 +525,15 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
+      // A cloud-linked account empties guest storage when it links, and guest
+      // auto-save is off while signed in, so anything there now is a copy of
+      // cloud data left by the earlier same-tab sign-out bug. Reset it so the
+      // signed-out page shows an empty guest workspace, as after linking.
+      if (user && localStorage.getItem(STORAGE_KEYS.CLOUD_LINKED_UID) === user.uid) {
+        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify([]));
+        localStorage.setItem(STORAGE_KEYS.QUICK_SHORTCUTS, JSON.stringify([]));
+      }
       localStorage.removeItem(STORAGE_KEYS.CLOUD_LINKED_UID);
     } catch {
       // ignore
@@ -480,6 +543,27 @@ export default function App() {
     await signOutUser();
   };
 
+  // Warm the on-demand screens in the background so their first open is instant.
+  useEffect(() => {
+    const run = () => PREFETCH_ON_IDLE.forEach((load) => void load().catch(() => {}));
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run, { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(run, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const wasSignedInRef = useRef(false);
+  const prefetchedWorkspaceRef = useRef<{
+    uid: string;
+    data: Awaited<ReturnType<typeof apiClient.getWorkspace>>;
+  } | null>(null);
+
   // Supabase Auth listener (Firebase-compatible facade) with pre-sync decision gate on login
   useEffect(() => {
     let cancelled = false;
@@ -488,6 +572,19 @@ export default function App() {
 
       if (!currentUser) {
         freshSignInTriggeredRef.current = false;
+        if (wasSignedInRef.current) {
+          // Signed in -> signed out in this tab: drop the cloud workspace from
+          // the screen and show this browser's guest workspace, exactly what a
+          // reload shows. Done in the same batch as setUser(null) so the guest
+          // auto-save effects never write cloud data into guest storage.
+          wasSignedInRef.current = false;
+          setCategories(readLocalCategories());
+          setBookmarks(readLocalBookmarks());
+          setQuickShortcuts(readLocalQuickShortcuts());
+          setActiveView('all');
+          setSelectedCategoryId('all');
+          setSelectedSubcategoryId('all');
+        }
         setUser(null);
         setAuthReady(true);
         setSyncGateStatus('idle');
@@ -496,6 +593,7 @@ export default function App() {
         return;
       }
 
+      wasSignedInRef.current = true;
       setUser(currentUser);
       setAuthReady(true);
 
@@ -519,31 +617,60 @@ export default function App() {
         return;
       }
 
-      // Fresh Google login or unlinked account: inspect local vs cloud data and prompt user
+      // Fresh login or unlinked account: no prompt. Merge this browser's guest
+      // workspace into the account (server de-duplicates websites by URL and
+      // categories by name), link the browser, then open the Main Page with the
+      // combined cloud workspace.
       setSyncGateStatus('checking');
       setCloudLoading(true);
       setSyncChoiceError('');
+      setPendingSyncChoice(null);
 
+      const localCategories = localCategoriesRef.current;
+      const localBookmarks = localBookmarksRef.current;
+      const localShortcuts = localQuickShortcutsRef.current;
+      const hasLocalData =
+        localCategories.length > 0 || localBookmarks.length > 0 || localShortcuts.length > 0;
+
+      let syncFailed = false;
       try {
-        const cloudData = await apiClient.getWorkspace();
+        if (hasLocalData) {
+          const synced = await apiClient.syncLocalWorkspace({
+            categories: localCategories,
+            bookmarks: localBookmarks,
+            quickShortcuts: localShortcuts,
+          });
+          // The sync already returns the full workspace: reuse it instead of
+          // fetching everything a second time.
+          prefetchedWorkspaceRef.current = { uid: currentUser.uid, data: synced };
+        }
         if (cancelled) return;
-
-        setPendingSyncChoice({
-          targetUser: currentUser,
-          localCategories: localCategoriesRef.current,
-          localBookmarks: localBookmarksRef.current,
-          localShortcuts: localQuickShortcutsRef.current,
-          cloudCategories: cloudData.categories,
-          cloudBookmarks: cloudData.bookmarks,
-          cloudShortcuts: cloudData.quickShortcuts,
-        });
-        setSyncGateStatus('awaiting_choice');
-        setCloudLoading(false);
+        try {
+          localStorage.setItem(STORAGE_KEYS.CLOUD_LINKED_UID, currentUser.uid);
+          localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify([]));
+          localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify([]));
+          localStorage.setItem(STORAGE_KEYS.QUICK_SHORTCUTS, JSON.stringify([]));
+        } catch {
+          // ignore
+        }
       } catch (error) {
         if (cancelled) return;
-        setCloudLoading(false);
-        setSyncGateStatus('ready');
-        console.error('Could not check existing cloud data:', error);
+        // Not linked: the guest copy stays in this browser and the merge is
+        // retried on the next sign-in. Nothing is lost.
+        syncFailed = true;
+        console.error('Automatic sync of local data failed:', error);
+      }
+
+      setActiveView('all');
+      setSelectedCategoryId('all');
+      setSelectedSubcategoryId('all');
+      setSyncGateStatus('ready');
+      if (syncFailed) {
+        setLiveSyncToast("Couldn't sync this device's websites yet. They're kept here and will sync next time you log in.");
+        setTimeout(() => setLiveSyncToast(null), 5000);
+      } else if (hasLocalData) {
+        setLiveSyncToast('Synced your websites to your account');
+        setTimeout(() => setLiveSyncToast(null), 3500);
       }
     });
 
@@ -566,8 +693,14 @@ export default function App() {
     let cancelled = false;
     setCloudLoading(true);
 
-    apiClient
-      .getWorkspace()
+    const prefetched = prefetchedWorkspaceRef.current;
+    prefetchedWorkspaceRef.current = null;
+    const workspacePromise =
+      prefetched && prefetched.uid === user.uid
+        ? Promise.resolve(prefetched.data)
+        : apiClient.getWorkspace();
+
+    workspacePromise
       .then((data) => {
         if (cancelled) return;
         setCategories(data.categories);
@@ -775,6 +908,38 @@ export default function App() {
     return map;
   }, [categories]);
 
+  // Count an open of a website (left or middle click). Drives the Main Page
+  // order "pinned first, then most used, then A–Z". Never blocks navigation.
+  const handleBookmarkOpened = (bm: BookmarkItem) => {
+    const now = new Date().toISOString();
+    setBookmarks((prev) =>
+      prev.map((b) =>
+        b.id === bm.id ? { ...b, openCount: (b.openCount ?? 0) + 1, lastOpenedAt: now } : b
+      )
+    );
+    if (user) {
+      apiClient.recordBookmarkOpen(bm.id).catch((err) => {
+        console.warn('Could not record website usage:', err);
+      });
+    }
+  };
+
+  // The order shown on the Main Page is frozen while you browse it, so opening a
+  // link doesn't make the list jump; it refreshes when the Main Page is shown again.
+  const [mainPageUsageSnapshot, setMainPageUsageSnapshot] = useState<
+    Record<string, number>
+  >({});
+  const isMainPageView =
+    activeView === 'all' && selectedCategoryId === 'all' && selectedSubcategoryId === 'all';
+  const usageSnapshotKey = `${isMainPageView}|${user?.uid ?? ''}|${syncGateStatus}|${cloudLoading}|${bookmarks.length}`;
+  useEffect(() => {
+    if (!isMainPageView) return;
+    const snap: Record<string, number> = {};
+    for (const b of bookmarks) snap[b.id] = b.openCount ?? 0;
+    setMainPageUsageSnapshot(snap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usageSnapshotKey]);
+
   // Filtered and Sorted Bookmarks (preserves Chrome import arrangement by default)
   const filteredBookmarks = useMemo(() => {
     return bookmarks
@@ -804,6 +969,14 @@ export default function App() {
         if (sortBy === 'alpha') {
           return a.title.localeCompare(b.title);
         }
+        if (sortBy === 'order' && isMainPageView) {
+          // Main Page: pinned first, then most used, then everything else A–Z.
+          if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+          const ua = mainPageUsageSnapshot[a.id] ?? a.openCount ?? 0;
+          const ub = mainPageUsageSnapshot[b.id] ?? b.openCount ?? 0;
+          if (ua !== ub) return ub - ua;
+          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true });
+        }
         if (sortBy === 'favorites') {
           if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
         }
@@ -830,6 +1003,8 @@ export default function App() {
     searchQuery,
     sortBy,
     categoryMap,
+    isMainPageView,
+    mainPageUsageSnapshot,
   ]);
 
   // Clear Entire Workspace (Categories, Subcategories, Bookmarks, and Quick Shortcuts)
@@ -2191,26 +2366,43 @@ export default function App() {
   if (activeShareId) {
     return (
       <>
-        <SharedCollectionView
-          shareId={activeShareId}
-          themeMode={settings.themeMode || 'dark'}
-          onToggleThemeMode={() =>
-            handleUpdateSettings({
-              themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
-            })
-          }
-          onExitShareView={handleExitShareView}
-          onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
-        />
-        <WebsitePreviewModal
-          bookmark={previewingBookmark}
-          category={null}
-          subcategory={null}
-          onClose={() => setPreviewingBookmark(null)}
-        />
+        <Suspense fallback={null}>
+          <SharedCollectionView
+            shareId={activeShareId}
+            themeMode={settings.themeMode || 'dark'}
+            onToggleThemeMode={() =>
+              handleUpdateSettings({
+                themeMode: (settings.themeMode || 'dark') === 'light' ? 'dark' : 'light',
+              })
+            }
+            onExitShareView={handleExitShareView}
+            onPreviewBookmark={(bm) => setPreviewingBookmark(bm)}
+          />
+        </Suspense>
+        <Deferred when={previewingBookmark !== null}>
+          <WebsitePreviewModal
+            bookmark={previewingBookmark}
+            category={null}
+            subcategory={null}
+            onClose={() => setPreviewingBookmark(null)}
+          />
+        </Deferred>
       </>
     );
   }
+
+  const signInLoadingStage: SignInLoadingStage | null =
+    !authReady && returningFromSignIn
+      ? 'signing-in'
+      : user && syncGateStatus === 'checking'
+      ? localBookmarksRef.current.length > 0 ||
+        localCategoriesRef.current.length > 0 ||
+        localQuickShortcutsRef.current.length > 0
+        ? 'syncing'
+        : 'loading'
+      : user && cloudLoading
+      ? 'loading'
+      : null;
 
   return (
     <div
@@ -2235,7 +2427,7 @@ export default function App() {
           <MyFavLogo size="md" />
         </a>
 
-        {/* Right-Aligned Top Navigation Menu (All Websites, Categories, Settings) */}
+        {/* Right-Aligned Top Navigation Menu (Main Page, Categories, Settings) */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300 ml-auto">
           {liveSyncToast && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
@@ -2264,7 +2456,7 @@ export default function App() {
                   : 'text-slate-400'
               }`}
             />
-            <span>All Websites</span>
+            <span>Main Page</span>
           </button>
 
           <button
@@ -2357,7 +2549,7 @@ export default function App() {
 
                 {/* Scrollable Category & Subcategory Tree */}
                 <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 pt-2.5">
-                  {/* All Websites Navigation Button */}
+                  {/* Main Page Navigation Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -2381,7 +2573,7 @@ export default function App() {
                       >
                         <Bookmark className="w-4 h-4" strokeWidth={2.1} />
                       </span>
-                      <span className="text-xs font-semibold truncate">All Websites</span>
+                      <span className="text-xs font-semibold truncate">Main Page</span>
                     </div>
                     <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[10px] font-mono-tabular text-slate-400">
                       {bookmarks.length}
@@ -2885,7 +3077,7 @@ export default function App() {
 
                 {/* Vertical Enhanced Category Icons List */}
                 <div className="flex-1 overflow-y-auto space-y-2.5 py-3 w-full flex flex-col items-center no-scrollbar">
-                  {/* All Websites Icon */}
+                  {/* Main Page Icon */}
                   <div className="relative flex flex-col items-center w-full">
                     {activeView === 'all' && selectedCategoryId === 'all' && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full accent-bg shadow-[0_0_10px_var(--accent-primary)]" />
@@ -2897,8 +3089,8 @@ export default function App() {
                         setSelectedCategoryId('all');
                         setSelectedSubcategoryId('all');
                       }}
-                      title={`All Websites (${bookmarks.length})`}
-                      aria-label="All Websites"
+                      title={`Main Page (${bookmarks.length})`}
+                      aria-label="Main Page"
                       className={`group/icon relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                         activeView === 'all' && selectedCategoryId === 'all'
                           ? 'accent-bg text-white shadow-[0_6px_16px_rgba(var(--accent-rgb),0.35)] scale-105'
@@ -3151,51 +3343,59 @@ export default function App() {
         {/* Main Viewport */}
         <main className="flex-1 min-w-0 space-y-5">
           {activeView === 'categories' ? (
-            <CategoriesPage
-              onBackToDirectory={() => setActiveView('all')}
-              onSelectCategoryInDirectory={(catId, subId) => {
-                setSelectedCategoryId(catId);
-                setSelectedSubcategoryId(subId || 'all');
-                setActiveView('all');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              categories={categories}
-              bookmarks={bookmarks}
-              sharedByCategoryId={sharedByCategoryId}
-              onOpenShareModal={(cat) => setSharingCategory(cat)}
-              onCreateCategory={async (name, icon, parentId) => {
-                await handleCreateCategory(name, icon, parentId);
-              }}
-              onUpdateCategory={handleUpdateCategory}
-              onDeleteCategory={handleDeleteCategory}
-              onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
-            />
+            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
+                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
+              </div>}>
+              <CategoriesPage
+                onBackToDirectory={() => setActiveView('all')}
+                onSelectCategoryInDirectory={(catId, subId) => {
+                  setSelectedCategoryId(catId);
+                  setSelectedSubcategoryId(subId || 'all');
+                  setActiveView('all');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                categories={categories}
+                bookmarks={bookmarks}
+                sharedByCategoryId={sharedByCategoryId}
+                onOpenShareModal={(cat) => setSharingCategory(cat)}
+                onCreateCategory={async (name, icon, parentId) => {
+                  await handleCreateCategory(name, icon, parentId);
+                }}
+                onUpdateCategory={handleUpdateCategory}
+                onDeleteCategory={handleDeleteCategory}
+                onClearAllCategoriesAndBookmarks={handleClearEntireWorkspace}
+              />
+            </Suspense>
           ) : activeView === 'settings' || activeView === 'chrome-sync' ? (
-            <SettingsPage
-              onBackToDirectory={() => setActiveView('all')}
-              settings={settings}
-              onUpdateSettings={handleUpdateSettings}
-              user={user}
-              onSignIn={async () => openAuthPage('login')}
-              onSignOut={handleSignOut}
-              onResetDefaults={handleClearEntireWorkspace}
-              existingCategoryCount={categories.length}
-              existingBookmarkCount={bookmarks.length}
-              categories={categories}
-              bookmarks={bookmarks}
-              quickShortcuts={quickShortcuts}
-              onImportExactPlan={handleImportExactChromePlan}
-              onClearEntireWorkspace={handleClearEntireWorkspace}
-              defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
-              linkedChromeFileName={linkedChromeFileName}
-              lastChromeSyncTime={lastChromeSyncTime}
-              autoWatchChromeFile={autoWatchChromeFile}
-              onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
-              onLinkLiveChromeFile={handleLinkLiveChromeFile}
-              onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
-              onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
-              onOpenImportModal={() => setIsChromeImportModalOpen(true)}
-            />
+            <Suspense fallback={<div className="glass-surface rounded-2xl h-64 flex items-center justify-center" role="status" aria-label="Loading">
+                <div className="w-7 h-7 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
+              </div>}>
+              <SettingsPage
+                onBackToDirectory={() => setActiveView('all')}
+                settings={settings}
+                onUpdateSettings={handleUpdateSettings}
+                user={user}
+                onSignIn={async () => openAuthPage('login')}
+                onSignOut={handleSignOut}
+                onResetDefaults={handleClearEntireWorkspace}
+                existingCategoryCount={categories.length}
+                existingBookmarkCount={bookmarks.length}
+                categories={categories}
+                bookmarks={bookmarks}
+                quickShortcuts={quickShortcuts}
+                onImportExactPlan={handleImportExactChromePlan}
+                onClearEntireWorkspace={handleClearEntireWorkspace}
+                defaultTab={activeView === 'chrome-sync' ? 'sync' : 'appearance'}
+                linkedChromeFileName={linkedChromeFileName}
+                lastChromeSyncTime={lastChromeSyncTime}
+                autoWatchChromeFile={autoWatchChromeFile}
+                onToggleAutoWatchChromeFile={handleToggleAutoWatchChromeFile}
+                onLinkLiveChromeFile={handleLinkLiveChromeFile}
+                onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+                onUnlinkLiveChromeFile={handleUnlinkLiveChromeFile}
+                onOpenImportModal={() => setIsChromeImportModalOpen(true)}
+              />
+            </Suspense>
           ) : (
             <>
               {/* Unified Top Header (matching Settings & Categories page header style) */}
@@ -3212,7 +3412,7 @@ export default function App() {
                       className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-1.5"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to All Websites</span>
+                      <span>Back to Main Page</span>
                     </button>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
@@ -3834,6 +4034,8 @@ export default function App() {
                                 href={bm.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => handleBookmarkOpened(bm)}
+                                onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                 className="text-xs sm:text-[13px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1 max-w-[200px] sm:max-w-[260px] shrink-0"
                               >
                                 <span className="truncate">{bm.title}</span>
@@ -3847,6 +4049,8 @@ export default function App() {
                                 href={bm.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => handleBookmarkOpened(bm)}
+                                onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                 title={bm.url}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-[11px] font-medium hover:bg-[var(--accent-primary)]/25 transition-colors truncate max-w-[220px] sm:max-w-xs lg:max-w-md"
                               >
@@ -3882,6 +4086,8 @@ export default function App() {
                                   href={bm.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={() => handleBookmarkOpened(bm)}
+                                  onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                   className="text-base sm:text-[17px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1.5"
                                 >
                                   <span className="truncate">{bm.title}</span>
@@ -3907,6 +4113,8 @@ export default function App() {
                                   href={bm.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={() => handleBookmarkOpened(bm)}
+                                  onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                   title={bm.url}
                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-xs font-semibold hover:bg-[var(--accent-primary)]/25 hover:border-[var(--accent-primary)]/50 transition-colors truncate max-w-[260px] sm:max-w-md lg:max-w-xl shadow-xs"
                                 >
@@ -4043,6 +4251,8 @@ export default function App() {
                             href={bm.url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => handleBookmarkOpened(bm)}
+                            onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                             className={`${
                               isCompact
                                 ? 'min-h-[28px] px-2.5 py-0.5 text-[11px]'
@@ -4128,76 +4338,90 @@ export default function App() {
       </nav>
 
       {/* Modals for Saving/Editing or Moving a Website */}
-      <BookmarkModal
-        isOpen={isBookmarkModalOpen}
-        onClose={() => {
-          setIsBookmarkModalOpen(false);
-          setEditingBookmark(null);
-        }}
-        onSave={handleSaveBookmark}
-        onQuickCreateCategory={(name, parentId) =>
-          handleCreateCategory(name, '', parentId)
-        }
-        categories={categories}
-        initialBookmark={editingBookmark}
-        defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
-        defaultSubcategoryId={
-          selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
-        }
-      />
+      <Deferred when={isBookmarkModalOpen}>
+        <BookmarkModal
+          isOpen={isBookmarkModalOpen}
+          onClose={() => {
+            setIsBookmarkModalOpen(false);
+            setEditingBookmark(null);
+          }}
+          onSave={handleSaveBookmark}
+          onQuickCreateCategory={(name, parentId) =>
+            handleCreateCategory(name, '', parentId)
+          }
+          categories={categories}
+          initialBookmark={editingBookmark}
+          defaultCategoryId={selectedCategoryId !== 'all' ? selectedCategoryId : undefined}
+          defaultSubcategoryId={
+            selectedSubcategoryId !== 'all' ? selectedSubcategoryId : undefined
+          }
+        />
+      </Deferred>
 
-      <MoveWebsiteModal
-        isOpen={bookmarksToMove.length > 0}
-        onClose={() => setBookmarksToMove([])}
-        bookmarksToMove={bookmarksToMove}
-        categories={categories}
-        onConfirmMove={handleMoveWebsites}
-      />
+      <Deferred when={bookmarksToMove.length > 0}>
+        <MoveWebsiteModal
+          isOpen={bookmarksToMove.length > 0}
+          onClose={() => setBookmarksToMove([])}
+          bookmarksToMove={bookmarksToMove}
+          categories={categories}
+          onConfirmMove={handleMoveWebsites}
+        />
+      </Deferred>
 
-      <BatchEditModal
-        isOpen={bookmarksToBatchEdit.length > 0}
-        onClose={() => setBookmarksToBatchEdit([])}
-        bookmarksToEdit={bookmarksToBatchEdit}
-        categories={categories}
-        onConfirmBatchEdit={handleBatchEditWebsites}
-      />
+      <Deferred when={bookmarksToBatchEdit.length > 0}>
+        <BatchEditModal
+          isOpen={bookmarksToBatchEdit.length > 0}
+          onClose={() => setBookmarksToBatchEdit([])}
+          bookmarksToEdit={bookmarksToBatchEdit}
+          categories={categories}
+          onConfirmBatchEdit={handleBatchEditWebsites}
+        />
+      </Deferred>
 
-      <WebsitePreviewModal
-        bookmark={previewingBookmark}
-        category={
-          previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
-        }
-        subcategory={
-          previewingBookmark?.subcategoryId
-            ? categoryMap[previewingBookmark.subcategoryId] || null
-            : null
-        }
-        onClose={() => setPreviewingBookmark(null)}
-      />
+      <Deferred when={previewingBookmark !== null}>
+        <WebsitePreviewModal
+          bookmark={previewingBookmark}
+          category={
+            previewingBookmark ? categoryMap[previewingBookmark.categoryId] || null : null
+          }
+          subcategory={
+            previewingBookmark?.subcategoryId
+              ? categoryMap[previewingBookmark.subcategoryId] || null
+              : null
+          }
+          onVisit={(bm) => handleBookmarkOpened(bm)}
+          onClose={() => setPreviewingBookmark(null)}
+        />
+      </Deferred>
 
-      <QuickShortcutModal
-        isOpen={isShortcutModalOpen}
-        onClose={() => {
-          setIsShortcutModalOpen(false);
-          setEditingShortcut(null);
-        }}
-        onSave={handleSaveQuickShortcut}
-        onDelete={handleDeleteQuickShortcut}
-        bookmarks={bookmarks}
-        initialShortcut={editingShortcut}
-      />
+      <Deferred when={isShortcutModalOpen}>
+        <QuickShortcutModal
+          isOpen={isShortcutModalOpen}
+          onClose={() => {
+            setIsShortcutModalOpen(false);
+            setEditingShortcut(null);
+          }}
+          onSave={handleSaveQuickShortcut}
+          onDelete={handleDeleteQuickShortcut}
+          bookmarks={bookmarks}
+          initialShortcut={editingShortcut}
+        />
+      </Deferred>
 
-      <ChromeImportModal
-        isOpen={isChromeImportModalOpen}
-        onClose={() => setIsChromeImportModalOpen(false)}
-        onImportExactPlan={handleImportExactChromePlan}
-        linkedChromeFileName={linkedChromeFileName}
-        lastChromeSyncTime={lastChromeSyncTime}
-        onLinkLiveChromeFile={handleLinkLiveChromeFile}
-        onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
-      />
+      <Deferred when={isChromeImportModalOpen}>
+        <ChromeImportModal
+          isOpen={isChromeImportModalOpen}
+          onClose={() => setIsChromeImportModalOpen(false)}
+          onImportExactPlan={handleImportExactChromePlan}
+          linkedChromeFileName={linkedChromeFileName}
+          lastChromeSyncTime={lastChromeSyncTime}
+          onLinkLiveChromeFile={handleLinkLiveChromeFile}
+          onRefreshLiveChromeFile={() => handleRefreshLiveChromeFile(true)}
+        />
+      </Deferred>
 
       {sharingCategory && (
+        <Suspense fallback={null}>
         <ShareCategoryModal
           category={sharingCategory}
           subcategories={subcategoriesByParent[sharingCategory.id] || []}
@@ -4213,52 +4437,59 @@ export default function App() {
           onPreviewSharedPage={handleOpenSharePreview}
           onClose={() => setSharingCategory(null)}
         />
+        </Suspense>
       )}
 
-      <AccountSyncModal
-        isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
-        userEmail={pendingSyncChoice?.targetUser.email || ''}
-        userName={pendingSyncChoice?.targetUser.displayName}
-        hasLocalData={Boolean(
-          pendingSyncChoice &&
-            (pendingSyncChoice.localCategories.length > 0 ||
-              pendingSyncChoice.localBookmarks.length > 0 ||
-              pendingSyncChoice.localShortcuts.length > 0)
-        )}
-        hasCloudData={Boolean(
-          pendingSyncChoice &&
-            (pendingSyncChoice.cloudCategories.length > 0 ||
-              pendingSyncChoice.cloudBookmarks.length > 0 ||
-              pendingSyncChoice.cloudShortcuts.length > 0)
-        )}
-        localCounts={{
-          categories: pendingSyncChoice?.localCategories.length || 0,
-          bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
-          shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
-        }}
-        cloudCounts={{
-          categories: pendingSyncChoice?.cloudCategories.length || 0,
-          bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
-          shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
-        }}
-        isProcessing={isSyncChoiceProcessing}
-        error={syncChoiceError}
-        onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
-        onKeepLocalOnly={handleChoiceKeepLocalOnly}
-        onGetCloudAndSync={handleChoiceGetCloudAndSync}
-        onStartFresh={handleChoiceStartFresh}
-      />
+      <SignInLoadingOverlay stage={signInLoadingStage} />
 
-      <AuthPage
-        isOpen={Boolean(authPageMode && !user)}
-        mode={authPageMode || 'login'}
-        onModeChange={(nextMode) => setAuthPageMode(nextMode)}
-        onClose={closeAuthPage}
-        onGoogleLogin={handleGoogleLogin}
-        onEmailLogin={handleEmailLogin}
-        onEmailRegister={handleEmailRegister}
-        onPasswordReset={handlePasswordReset}
-      />
+      <Deferred when={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}>
+        <AccountSyncModal
+          isOpen={syncGateStatus === 'awaiting_choice' && pendingSyncChoice !== null}
+          userEmail={pendingSyncChoice?.targetUser.email || ''}
+          userName={pendingSyncChoice?.targetUser.displayName}
+          hasLocalData={Boolean(
+            pendingSyncChoice &&
+              (pendingSyncChoice.localCategories.length > 0 ||
+                pendingSyncChoice.localBookmarks.length > 0 ||
+                pendingSyncChoice.localShortcuts.length > 0)
+          )}
+          hasCloudData={Boolean(
+            pendingSyncChoice &&
+              (pendingSyncChoice.cloudCategories.length > 0 ||
+                pendingSyncChoice.cloudBookmarks.length > 0 ||
+                pendingSyncChoice.cloudShortcuts.length > 0)
+          )}
+          localCounts={{
+            categories: pendingSyncChoice?.localCategories.length || 0,
+            bookmarks: pendingSyncChoice?.localBookmarks.length || 0,
+            shortcuts: pendingSyncChoice?.localShortcuts.length || 0,
+          }}
+          cloudCounts={{
+            categories: pendingSyncChoice?.cloudCategories.length || 0,
+            bookmarks: pendingSyncChoice?.cloudBookmarks.length || 0,
+            shortcuts: pendingSyncChoice?.cloudShortcuts.length || 0,
+          }}
+          isProcessing={isSyncChoiceProcessing}
+          error={syncChoiceError}
+          onSyncLocalToCloud={handleChoiceSyncLocalToCloud}
+          onKeepLocalOnly={handleChoiceKeepLocalOnly}
+          onGetCloudAndSync={handleChoiceGetCloudAndSync}
+          onStartFresh={handleChoiceStartFresh}
+        />
+      </Deferred>
+
+      <Deferred when={Boolean(authPageMode && !user)}>
+        <AuthPage
+          isOpen={Boolean(authPageMode && !user)}
+          mode={authPageMode || 'login'}
+          onModeChange={(nextMode) => setAuthPageMode(nextMode)}
+          onClose={closeAuthPage}
+          onGoogleLogin={handleGoogleLogin}
+          onEmailLogin={handleEmailLogin}
+          onEmailRegister={handleEmailRegister}
+          onPasswordReset={handlePasswordReset}
+        />
+      </Deferred>
     </div>
   );
 }
