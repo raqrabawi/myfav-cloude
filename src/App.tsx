@@ -908,6 +908,38 @@ export default function App() {
     return map;
   }, [categories]);
 
+  // Count an open of a website (left or middle click). Drives the Main Page
+  // order "pinned first, then most used, then A–Z". Never blocks navigation.
+  const handleBookmarkOpened = (bm: BookmarkItem) => {
+    const now = new Date().toISOString();
+    setBookmarks((prev) =>
+      prev.map((b) =>
+        b.id === bm.id ? { ...b, openCount: (b.openCount ?? 0) + 1, lastOpenedAt: now } : b
+      )
+    );
+    if (user) {
+      apiClient.recordBookmarkOpen(bm.id).catch((err) => {
+        console.warn('Could not record website usage:', err);
+      });
+    }
+  };
+
+  // The order shown on the Main Page is frozen while you browse it, so opening a
+  // link doesn't make the list jump; it refreshes when the Main Page is shown again.
+  const [mainPageUsageSnapshot, setMainPageUsageSnapshot] = useState<
+    Record<string, number>
+  >({});
+  const isMainPageView =
+    activeView === 'all' && selectedCategoryId === 'all' && selectedSubcategoryId === 'all';
+  const usageSnapshotKey = `${isMainPageView}|${user?.uid ?? ''}|${syncGateStatus}|${cloudLoading}|${bookmarks.length}`;
+  useEffect(() => {
+    if (!isMainPageView) return;
+    const snap: Record<string, number> = {};
+    for (const b of bookmarks) snap[b.id] = b.openCount ?? 0;
+    setMainPageUsageSnapshot(snap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usageSnapshotKey]);
+
   // Filtered and Sorted Bookmarks (preserves Chrome import arrangement by default)
   const filteredBookmarks = useMemo(() => {
     return bookmarks
@@ -937,6 +969,14 @@ export default function App() {
         if (sortBy === 'alpha') {
           return a.title.localeCompare(b.title);
         }
+        if (sortBy === 'order' && isMainPageView) {
+          // Main Page: pinned first, then most used, then everything else A–Z.
+          if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+          const ua = mainPageUsageSnapshot[a.id] ?? a.openCount ?? 0;
+          const ub = mainPageUsageSnapshot[b.id] ?? b.openCount ?? 0;
+          if (ua !== ub) return ub - ua;
+          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true });
+        }
         if (sortBy === 'favorites') {
           if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
         }
@@ -963,6 +1003,8 @@ export default function App() {
     searchQuery,
     sortBy,
     categoryMap,
+    isMainPageView,
+    mainPageUsageSnapshot,
   ]);
 
   // Clear Entire Workspace (Categories, Subcategories, Bookmarks, and Quick Shortcuts)
@@ -3992,6 +4034,8 @@ export default function App() {
                                 href={bm.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => handleBookmarkOpened(bm)}
+                                onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                 className="text-xs sm:text-[13px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1 max-w-[200px] sm:max-w-[260px] shrink-0"
                               >
                                 <span className="truncate">{bm.title}</span>
@@ -4005,6 +4049,8 @@ export default function App() {
                                 href={bm.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => handleBookmarkOpened(bm)}
+                                onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                 title={bm.url}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-[11px] font-medium hover:bg-[var(--accent-primary)]/25 transition-colors truncate max-w-[220px] sm:max-w-xs lg:max-w-md"
                               >
@@ -4040,6 +4086,8 @@ export default function App() {
                                   href={bm.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={() => handleBookmarkOpened(bm)}
+                                  onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                   className="text-base sm:text-[17px] font-semibold text-slate-100 hover:text-[var(--accent-light)] transition-colors truncate flex items-center gap-1.5"
                                 >
                                   <span className="truncate">{bm.title}</span>
@@ -4065,6 +4113,8 @@ export default function App() {
                                   href={bm.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={() => handleBookmarkOpened(bm)}
+                                  onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                                   title={bm.url}
                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30 text-[var(--accent-light)] font-mono text-xs font-semibold hover:bg-[var(--accent-primary)]/25 hover:border-[var(--accent-primary)]/50 transition-colors truncate max-w-[260px] sm:max-w-md lg:max-w-xl shadow-xs"
                                 >
@@ -4201,6 +4251,8 @@ export default function App() {
                             href={bm.url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => handleBookmarkOpened(bm)}
+                            onAuxClick={(e) => e.button === 1 && handleBookmarkOpened(bm)}
                             className={`${
                               isCompact
                                 ? 'min-h-[28px] px-2.5 py-0.5 text-[11px]'
@@ -4337,6 +4389,7 @@ export default function App() {
               ? categoryMap[previewingBookmark.subcategoryId] || null
               : null
           }
+          onVisit={(bm) => handleBookmarkOpened(bm)}
           onClose={() => setPreviewingBookmark(null)}
         />
       </Deferred>

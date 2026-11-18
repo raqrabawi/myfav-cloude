@@ -35,6 +35,8 @@ export interface BookmarkRow {
   is_favorite: boolean;
   created_at: string;
   updated_at: string;
+  open_count?: number | null;
+  last_opened_at?: string | null;
 }
 
 export interface QuickShortcutRow {
@@ -102,6 +104,8 @@ export function mapBookmark(r: BookmarkRow): BookmarkItem {
     isFavorite: Boolean(r.is_favorite),
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
+    openCount: Number(r.open_count ?? 0) || 0,
+    lastOpenedAt: r.last_opened_at ? iso(r.last_opened_at) : '',
   };
 }
 

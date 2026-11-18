@@ -45,6 +45,7 @@ const cloudWorkspace = {
 const api = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   syncLocalWorkspace: vi.fn(),
+  recordBookmarkOpen: vi.fn(),
 }));
 vi.mock('../../src/lib/apiClient', () => {
   return {
@@ -74,6 +75,7 @@ let host: HTMLDivElement;
 beforeEach(() => {
   api.getWorkspace.mockReset().mockImplementation(async () => cloudWorkspace);
   api.syncLocalWorkspace.mockReset().mockImplementation(async () => cloudWorkspace);
+  api.recordBookmarkOpen.mockReset().mockImplementation(async () => ({ ok: true }));
   localStorage.clear();
   sessionStorage.clear();
   authState.cb = null;
@@ -231,5 +233,44 @@ describe('loading animation after sign-in', () => {
     await act(async () => authState.cb?.(signedInUser));
     await wait(800);
     expect(overlay()).toBeNull();
+  });
+});
+
+describe('Main Page order: pinned first, then most used, then A–Z', () => {
+  const bm = (id: string, title: string, extra: Record<string, unknown> = {}) => ({
+    id, ownerId: 'u1', title, url: `https://${id}.example`, description: '', categoryId: 'c1', subcategoryId: '',
+    isFavorite: false, createdAt: now, updatedAt: now, openCount: 0, lastOpenedAt: '', ...extra,
+  });
+  const workspace = {
+    ...cloudWorkspace,
+    bookmarks: [
+      bm('zeta', 'Zeta'),
+      bm('alpha', 'alpha'),
+      bm('used5', 'Mid Used', { openCount: 5 }),
+      bm('pinB', 'Pinned B', { isFavorite: true }),
+      bm('used9', 'Top Used', { openCount: 9 }),
+      bm('pinA', 'Pinned A', { isFavorite: true, openCount: 1 }),
+      bm('beta', 'Beta'),
+    ],
+  };
+  const order = () =>
+    [...host.querySelectorAll<HTMLAnchorElement>('a[href^="https://"][href$=".example"]')]
+      .map((a) => a.getAttribute('href')!.replace('https://', '').replace('.example', ''))
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+
+  it('orders the Main Page after sign-in and counts a click without reordering mid-visit', async () => {
+    localStorage.setItem(KEYS.LINKED, 'u1');
+    api.getWorkspace.mockImplementation(async () => workspace);
+    await renderSignedIn();
+    // pinned (by usage, then A–Z) -> most used -> rest A–Z (case-insensitive)
+    expect(order()).toEqual(['pinA', 'pinB', 'used9', 'used5', 'alpha', 'Beta'.toLowerCase(), 'zeta']);
+
+    const zetaLink = host.querySelector<HTMLAnchorElement>('a[href="https://zeta.example"]')!;
+    await act(async () => {
+      zetaLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+    expect(api.recordBookmarkOpen).toHaveBeenCalledWith('zeta');
+    // the list doesn't jump while you are on it
+    expect(order()).toEqual(['pinA', 'pinB', 'used9', 'used5', 'alpha', 'beta', 'zeta']);
   });
 });
