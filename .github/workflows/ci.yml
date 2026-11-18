@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # full history + tags: the Figma update package diffs against the figma-live tag
+          fetch-depth: 0 # full history: the Figma update package diffs against the figma-live branch
       - uses: actions/setup-node@v4
         with:
           node-version: 22

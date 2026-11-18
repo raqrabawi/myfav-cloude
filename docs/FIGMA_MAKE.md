@@ -25,8 +25,8 @@ until someone removes them, so every update must also say what to delete.
 
 ## Updating with only the changed files (normal way)
 
-The git tag **`figma-live`** marks the version currently in Figma Make. Every update package is
-measured from that tag.
+The git branch **`figma-live`** marks the version currently in Figma Make. Every update package is
+measured from that branch.
 
 - `npm run package:figma -- --since figma-live` writes
   `dist-figma/myfav-figma-update-<from>-to-<to>.zip`. It contains only the app files that changed,
@@ -39,8 +39,8 @@ Steps in Figma Make:
 2. Delete the files it lists.
 3. Publish.
 
-**After a confirmed publish, move the tag** so the next update starts from the new version:
-`git tag -f figma-live <commit> && git push -f origin figma-live`.
+**After a confirmed publish, move the marker** so the next update starts from the new version:
+`git push origin <commit>:refs/heads/figma-live`.
 If an update is skipped, the next one still includes its files, because the package is always
 measured from `figma-live`, not from the previous update.
 
