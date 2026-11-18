@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "MyFav V2 \u2014 Supabase-first personal web curator (UI identical to MyFav original).",
+  "description": "MyFav V2 — Supabase-first personal web curator (UI identical to MyFav original).",
   "scripts": {
     "dev": "vite --port 3000 --host 0.0.0.0",
     "build": "vite build",
@@ -16,7 +16,8 @@
     "test:e2e": "playwright test tests/e2e",
     "test:visual": "playwright test tests/visual",
     "db:local:apply": "bash scripts/local-db.sh apply",
-    "auth:smoke": "node --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/neon-auth-smoke.mjs"
+    "auth:smoke": "node --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/neon-auth-smoke.mjs",
+    "package:figma": "node scripts/package-figma.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.14.2",
